@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C G:/AgentScope status)",
+      "Bash(pnpm -v)",
+      "Bash(git --version)",
+      "Bash(corepack --version)",
+      "Bash(npm -v)",
+      "Bash(corepack enable *)",
+      "Bash(corepack prepare *)",
+      "Bash(npm i *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm build *)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm lint *)"
+    ]
+  }
+}

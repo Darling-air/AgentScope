@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# AgentScope local session state (not committed by default in V0)
+.agentscope/current-scope.yaml
+.agentscope/scopes/
+.agentscope/evidence/
