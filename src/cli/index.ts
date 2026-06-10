@@ -18,10 +18,8 @@ const program = new Command();
 
 program
   .name("agentscope")
-  .description(
-    "Least-privilege, task-scoped governance for AI coding agents (V0 prototype).",
-  )
-  .version("0.0.0");
+  .description("Task-scoped runtime governance for AI coding agents.")
+  .version("0.1.0");
 
 program
   .command("init")
@@ -34,8 +32,10 @@ program
   .command("start")
   .description("Infer a Task Scope Contract from a task and approve it")
   .argument("<task>", "natural language task description")
-  .action(async (task: string) => {
-    await startCommand(task);
+  .option("--dry-run", "Show the inferred scope without writing or prompting")
+  .option("--json", "Output the inferred scope as JSON (no write, no prompt)")
+  .action(async (task: string, options: { dryRun?: boolean; json?: boolean }) => {
+    await startCommand(task, options);
   });
 
 program
@@ -53,10 +53,10 @@ program
   });
 
 // `agentscope hook claude-code pre-tool-use`
-// Dry-run hook translator: stdin payload -> policy decision -> stdout response.
+// Hook translator: stdin payload -> policy decision -> stdout response.
 const hook = program
   .command("hook")
-  .description("Agent hook entrypoints (dry-run in V1.1)");
+  .description("Agent hook entrypoints");
 
 const hookClaudeCode = hook
   .command("claude-code")
@@ -121,7 +121,7 @@ evidence
 // `agentscope report`
 program
   .command("report")
-  .description("Print a V1.3 audit summary from the Evidence Package")
+  .description("Print an audit summary (counts, denied/asked actions, risk score) from the Evidence Package")
   .action(() => {
     reportCommand();
   });

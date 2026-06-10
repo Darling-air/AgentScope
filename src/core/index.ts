@@ -3,6 +3,7 @@ export * from "./schema/config.js";
 export * from "./scope/task-id.js";
 export * from "./scope/create-scope.js";
 export * from "./scope/scope-io.js";
+export * from "./scope-inference/index.js";
 export * from "./config/default-config.js";
 export * from "./config/load-config.js";
 export * from "./git/changed-files.js";

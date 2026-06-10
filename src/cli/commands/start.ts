@@ -1,11 +1,18 @@
 import { mkdirSync, existsSync } from "node:fs";
 import { getProjectPaths, scopeFileForTask } from "../../core/fs/project-paths.js";
 import { loadConfig, ConfigError } from "../../core/config/load-config.js";
-import { createScope } from "../../core/scope/create-scope.js";
+import { createScopeWithInference } from "../../core/scope/create-scope.js";
 import { writeScope } from "../../core/scope/scope-io.js";
 import type { ScopeContract } from "../../core/schema/scope-contract.js";
 import { color, printList } from "../ui.js";
 import { prompt } from "../prompt.js";
+
+export interface StartOptions {
+  /** Show the inferred scope without writing or prompting. */
+  dryRun?: boolean;
+  /** Emit the inferred scope as parseable JSON (implies no write/prompt). */
+  json?: boolean;
+}
 
 /** Renders a Task Scope Contract as a readable summary block. */
 export function printScopeSummary(scope: ScopeContract): void {
@@ -41,10 +48,28 @@ function formatConfidence(c: number): string {
  *
  * Infers a Task Scope Contract from the task description, shows it, asks for
  * approval, then writes it to current-scope.yaml and scopes/<id>.yaml.
+ *
+ * `--dry-run` shows the inferred scope without writing or prompting.
+ * `--json` emits the inferred scope (plus classification metadata) as JSON and,
+ * like `--dry-run`, writes nothing and skips the prompt.
  */
-export async function startCommand(task: string): Promise<void> {
+export async function startCommand(
+  task: string,
+  options: StartOptions = {},
+): Promise<void> {
   const title = task.trim();
   if (!title) {
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          { error: "invalid_task", message: "task description is required" },
+          null,
+          2,
+        ),
+      );
+      process.exitCode = 1;
+      return;
+    }
     console.error(
       color.red('Error: task description is required. Usage: agentscope start "<task>"'),
     );
@@ -59,20 +84,57 @@ export async function startCommand(task: string): Promise<void> {
     config = loadConfig(paths);
   } catch (err) {
     if (err instanceof ConfigError) {
-      console.error(color.red(err.message));
+      if (options.json) {
+        console.log(
+          JSON.stringify({ error: "config_error", message: err.message }, null, 2),
+        );
+      } else {
+        console.error(color.red(err.message));
+      }
       process.exitCode = 1;
       return;
     }
     throw err;
   }
 
-  const scope = createScope({
+  const inferred = createScopeWithInference({
     rawInput: task,
     config,
     createdAt: new Date().toISOString(),
   });
+  const scope = inferred.scope;
+
+  // --json: machine-readable output, no write, no prompt.
+  if (options.json) {
+    console.log(
+      JSON.stringify(
+        {
+          scope,
+          classification: inferred.classification,
+          matched_rule_packs: inferred.matchedRulePacks,
+          used_fallback: inferred.usedFallback,
+          dry_run: options.dryRun ?? false,
+        },
+        null,
+        2,
+      ),
+    );
+    process.exitCode = 0;
+    return;
+  }
 
   printScopeSummary(scope);
+
+  // --dry-run: show the scope, write nothing, skip the prompt.
+  if (options.dryRun) {
+    console.log(
+      color.dim(
+        "Dry run: nothing was written. Re-run without --dry-run to approve and save.",
+      ),
+    );
+    process.exitCode = 0;
+    return;
+  }
 
   const answer = (await prompt("Approve? [Y/n/e] ")).toLowerCase();
 
