@@ -15,18 +15,5 @@
       "Bash(pnpm typecheck *)",
       "Bash(pnpm lint *)"
     ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Read|Edit|Write|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "agentscope hook claude-code pre-tool-use"
-          }
-        ]
-      }
-    ]
   }
 }

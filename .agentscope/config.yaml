@@ -1,0 +1,32 @@
+project:
+  package_manager: auto
+
+defaults:
+  allowed_paths:
+    - "src/**"
+    - "tests/**"
+    - "__tests__/**"
+
+  blocked_paths:
+    - ".env*"
+    - "secrets/**"
+    - "migrations/**"
+    - ".github/**"
+    - "infra/**"
+
+  high_risk:
+    - "package.json"
+    - "package-lock.json"
+    - "pnpm-lock.yaml"
+    - "yarn.lock"
+
+  allowed_commands:
+    - "npm test"
+    - "npm run lint"
+
+  dangerous_commands:
+    - "rm -rf *"
+    - "curl * | sh"
+    - "wget * | sh"
+    - "git push --force"
+    - "sudo *"

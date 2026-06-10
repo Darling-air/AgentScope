@@ -6,7 +6,13 @@ AgentScope turns a single natural-language coding task into an explicit, auditab
 
 > AgentScope = Least-privilege sessions for AI coding agents.
 
-This repository is currently at **V0**: a local, deterministic prototype. There is no LLM call, no network access, and no agent integration yet.
+This repository is currently at **V0**: a local, deterministic prototype. There is no LLM call and no network access.
+
+> V1 development is underway with an agent-agnostic policy engine foundation — the internal `PolicyEngine` (`ToolEvent` → `PolicyDecision`) that agent adapters build on.
+>
+> **V1.1** added a *dry-run* Claude Code hook translator: `agentscope hook claude-code pre-tool-use` reads a Claude Code `PreToolUse` payload from stdin and emits a hook response on stdout.
+>
+> **V1.2** adds the **Claude Code hook installer**: `agentscope install claude-code` registers the PreToolUse hook in your Claude Code settings so a live session is actually governed by the active scope. Still **not** implemented: Evidence Package, Risk Scoring, and the GitHub Action / PR Policy Gate.
 
 ## What V0 can do
 
@@ -115,6 +121,65 @@ Exit codes (designed so this can later gate CI):
 - **only warnings** → exit code `0`
 - **all OK / no changes** → exit code `0`
 
+## Dry-run Claude Code hook (V1.1, experimental)
+
+You can preview how the policy engine would respond to a Claude Code tool call without installing anything. The command reads a `PreToolUse` payload from stdin and prints a Claude Code hook response:
+
+```bash
+echo '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":".env.local"}}' \
+  | agentscope hook claude-code pre-tool-use
+```
+
+```json
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by AgentScope: .env.local matches blocked path .env*"}}
+```
+
+It reads the active `.agentscope/current-scope.yaml` and `config.yaml` from the current project. If there is no active scope, the payload is invalid, or anything else goes wrong, it returns a safe `ask` response (and still exits `0`) so a misconfigured hook never crashes the agent or silently allows an action.
+
+This is a **dry-run only**. To wire it into a live Claude Code session, install it (see below).
+
+## Governing Claude Code (V1.2)
+
+`agentscope install claude-code` registers AgentScope's PreToolUse hook in your Claude Code settings. Once installed, Claude Code calls `agentscope hook claude-code pre-tool-use` before every `Read` / `Edit` / `Write` / `Bash` tool use, and AgentScope returns `allow` / `ask` / `deny` based on the active scope.
+
+```bash
+agentscope init
+agentscope start "Fix login redirect bug"
+agentscope install claude-code
+claude
+```
+
+Now, if Claude tries to read `.env.local`, the hook returns `deny` (because `.env*` is a blocked path in the scope), and Claude Code blocks the read. Editing `package.json` returns `ask` (high-risk), editing `src/auth/login.ts` returns `allow`, and `rm -rf node_modules` returns `deny` (dangerous command).
+
+### Where it writes
+
+| Command | Target file |
+| --- | --- |
+| `agentscope install claude-code` | `.claude/settings.local.json` (default, not committed) |
+| `agentscope install claude-code --shared` | `.claude/settings.json` (committed, shared with the team) |
+
+The default is the **local** settings file so installing AgentScope does not change shared project config. Use `--shared` deliberately when the whole team should get the hook.
+
+### Safety
+
+- **Backup**: before the first write, the existing settings file is copied to `<file>.agentscope-backup`. An existing backup is never overwritten, so it always holds your original pre-AgentScope settings.
+- **Non-destructive**: install preserves all other hooks and settings — it only adds or refreshes the single AgentScope PreToolUse entry. Installing twice is idempotent (no duplicates).
+- **Malformed settings**: if the settings file is not valid JSON, AgentScope refuses to overwrite it and reports an error.
+- **Dry run**: `agentscope install claude-code --dry-run` prints the target path and the resulting settings without writing anything or creating a backup.
+
+### Uninstall
+
+```bash
+agentscope uninstall claude-code            # removes the hook from settings.local.json
+agentscope uninstall claude-code --shared   # removes it from settings.json
+```
+
+Uninstall removes **only** the AgentScope hook, leaving your other hooks intact. It does not restore the backup file and does not delete the `.claude/` directory. If you want your exact original settings back, restore the `.agentscope-backup` file manually.
+
+### A note on the hook command
+
+The installed hook runs the bare command `agentscope hook claude-code pre-tool-use`, which requires the `agentscope` CLI to be on your `PATH`. Install it globally (`pnpm link --global` from this repo, or a published package once available) so Claude Code can invoke it. If `agentscope` is not on `PATH`, the hook will fail to run — adjust the command in your settings to an absolute path or a `pnpm`-prefixed invocation if needed.
+
 ## Files AgentScope writes
 
 ```
@@ -130,18 +195,17 @@ AgentScope never reads the *contents* of your source or secret files — it only
 
 ## Not supported yet
 
-V0 deliberately does **not** include (these are planned for later milestones):
+These are planned for later milestones:
 
-- Claude Code hooks / runtime enforcement — *V1*
-- Claude Code adapter / `agentscope install` — *V1*
-- Evidence Package (full schema + hashes) — *V1 / V3*
-- Risk Scoring — *V1*
+- ✅ Claude Code PreToolUse hook + installer — *done in V1.0–V1.2*
+- Evidence Package (full schema + hashes) — *V1.3 / V3*
+- Risk Scoring (`agentscope risk`) — *V1.3*
 - GitHub Action / Policy Gate in CI — *V3*
 - Team Policy Registry & templates — *V4*
-- Multi-agent governance, MCP handling — *V5*
+- Multi-agent governance (Cursor / Codex / Gemini), MCP-specific handling — *V5*
 - Web UI / dashboard, cloud services, LLM-based inference — later / out of scope
 
-In particular, **runtime enforcement (actually blocking an agent's action) is not part of V0.** V0 only checks the resulting `git` diff after the fact. Claude Code hook enforcement will arrive in V1.
+Note: `agentscope check` still inspects the resulting `git` diff after the fact. The V1.2 Claude Code hook adds *live* enforcement during a session, but the two are complementary — the diff check does not require any agent integration.
 
 ## Development
 
