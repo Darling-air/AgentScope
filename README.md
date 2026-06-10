@@ -1,41 +1,94 @@
 # AgentScope
 
-**Least-privilege, task-scoped governance for AI coding agents.**
+**Task-scoped runtime governance for AI coding agents.**
 
-AgentScope turns a single natural-language coding task into an explicit, auditable **Task Scope Contract** — a declaration of which paths a session may touch, which are off-limits, which are high-risk, and which commands are allowed. It then checks your actual `git` changes against that contract.
+AgentScope gives Claude Code a least-privilege task scope, enforces it at runtime, records evidence, and calculates a deterministic risk score.
 
-> AgentScope = Least-privilege sessions for AI coding agents.
+It turns a single natural-language coding task into an explicit, auditable **Task Scope Contract** — which paths a session may touch, which are off-limits, which are high-risk, and which commands are allowed — and then enforces that contract live, before each tool runs.
 
-This repository started as a local, deterministic prototype (**V0**) and has grown an agent-agnostic policy engine plus live Claude Code enforcement. There is still no LLM call and no network access.
+> Use tokens only to inform the agent. Use deterministic local code to govern the agent. No LLM judging, no network calls.
 
-> The agent-agnostic foundation is the internal `PolicyEngine` (`ToolEvent` → `PolicyDecision`) that agent adapters build on.
->
-> **V1.1** added a *dry-run* Claude Code hook translator: `agentscope hook claude-code pre-tool-use` reads a Claude Code `PreToolUse` payload from stdin and emits a hook response on stdout.
->
-> **V1.2 — done.** The **Claude Code hook installer** is complete: `agentscope install claude-code` registers the PreToolUse hook in your Claude Code settings, so a live Claude Code session is now governed by the active scope in real time. `Read` / `Edit` / `Write` / `Bash` are enforced at runtime against the Task Scope Contract.
->
-> **V1.3 — done.** The **Evidence Event Recorder** is complete: every live policy decision is appended to a local audit artifact at `.agentscope/evidence/latest.json`, and `agentscope evidence show` / `agentscope report` summarize it.
->
-> **V1.4 — done.** **Risk Score V1** is complete: `agentscope risk` reads the Evidence Package and computes a deterministic, explainable 0–100 risk score with per-factor breakdown and recommendations, and `agentscope report` now includes that score. This is a read-only summary — it is **not** a policy gate, sets no failing exit code, and never changes hook enforcement. Still **not** implemented: the GitHub Action / PR Policy Gate (V3).
+## Demo
 
-## What V0 can do
+```text
+Task:
+  Fix login redirect bug
 
-- `agentscope init` — scaffold `.agentscope/` with a default config
-- `agentscope start "<task>"` — infer a Task Scope Contract from the task, show it, and ask for approval
-- `agentscope show` — display the current scope contract
-- `agentscope check` — compare current `git` changes against the scope and report OK / warnings / violations
+Scope:
+  allow  src/auth/**
+  block  .env*
+  ask    on package.json
 
-The core idea V0 proves:
+Claude Code:
+  Read  .env.local          → DENY
+  Write package.json        → ASK
+  Edit  src/auth/login.ts   → ALLOW
 
-```
-Natural-language task
-  → Task Scope Contract
-  → human approval
-  → .agentscope/current-scope.yaml
-  → git diff scope check
+AgentScope:
+  evidence/latest.json
+  risk score: 55 / 100  (high)
 ```
 
-Scope inference in V0 is intentionally simple and **deterministic**:
+When Claude Code tries to read `.env.local`, AgentScope denies it. When it tries to modify `package.json`, AgentScope asks for confirmation. When it edits `src/auth/login.ts`, AgentScope allows it — and every decision is recorded as evidence and rolled up into a deterministic risk score.
+
+## Core capabilities
+
+- ✅ **Task Scope Contract** — a least-privilege, per-task declaration of allowed / blocked / high-risk paths and commands
+- ✅ **Claude Code runtime enforcement** — a PreToolUse hook returns `allow` / `ask` / `deny` before each `Read` / `Edit` / `Write` / `Bash`
+- ✅ **Evidence Package** — every decision is appended to `.agentscope/evidence/latest.json` (governance metadata only)
+- ✅ **Deterministic Risk Score** — an explainable 0–100 score with per-factor breakdown and recommendations
+- ✅ **Local-first, no LLM judging** — all inference, enforcement, evidence, and scoring run locally with no network access
+
+## Status
+
+- ✅ Claude Code supported (live runtime enforcement)
+- ⏳ Policy Gate — **not implemented yet** (planned, V3)
+- ⏳ GitHub Action — **not implemented yet** (planned, V3)
+
+`agentscope risk` and `agentscope report` are read-only summaries. They never fail CI, apply no threshold, and never change hook enforcement.
+
+## Quickstart
+
+Requires Node.js ≥ 18 and [pnpm](https://pnpm.io/). Run from a project that is a **git repository**.
+
+```bash
+# 1. Build and link the CLI
+pnpm install
+pnpm build
+pnpm link --global
+
+# 2. Set up a least-privilege scope for your task
+agentscope init
+agentscope start "Fix login redirect bug"   # shows the inferred scope, asks to approve
+
+# 3. Install the Claude Code hook, then start coding
+agentscope install claude-code
+claude
+```
+
+In the live Claude Code session, try prompts that exercise each decision:
+
+```text
+请使用 Read 工具读取 .env.local          → AgentScope denies it
+请编辑 package.json，加一个测试字段       → AgentScope asks for confirmation
+请编辑 src/auth/login.ts，加一行注释       → AgentScope allows it
+```
+
+Then inspect what happened:
+
+```bash
+agentscope evidence show   # summary of recorded policy decisions
+agentscope risk            # deterministic risk score + factors + recommendations
+agentscope report          # audit summary: counts, denied/asked actions, risk score
+```
+
+> **Windows / PATH note:** if `agentscope` is not found after `pnpm link --global`, make sure the pnpm global bin directory is on your `PATH`. Run `pnpm bin --global` to find it, then add it to `PATH`. Alternatively, run the CLI directly with `node dist/index.js <command>` or `pnpm agentscope <command>`.
+
+A full, reproducible walkthrough lives in [`examples/live-demo/`](examples/live-demo/README.md).
+
+## What `agentscope start` infers (V0 scope inference)
+
+Scope inference is intentionally simple and **deterministic** — no LLM, no network:
 
 - Task title → kebab-case task id
 - Keyword matching for likely paths:
@@ -46,86 +99,16 @@ Scope inference in V0 is intentionally simple and **deterministic**:
 - No keyword match → fall back to the config's default allowed paths
 - Confidence: `0.80` (multiple keyword hits), `0.72` (one), `0.55` (defaults only)
 
-## Install
-
-Requires Node.js ≥ 18 and [pnpm](https://pnpm.io/).
+Review or edit the active scope at any time:
 
 ```bash
-pnpm install
-pnpm build
+agentscope show               # display the current Task Scope Contract
+agentscope check              # compare current git changes against the scope
 ```
 
-This produces a runnable CLI at `dist/index.js`. To run it during development:
+`agentscope check` classifies each changed file as OK / warning / violation and exits `1` only when a blocked path was modified — useful as a complementary, after-the-fact diff check that needs no agent integration.
 
-```bash
-node dist/index.js <command>
-# or, via the package script:
-pnpm agentscope <command>
-```
-
-You can also link it globally:
-
-```bash
-pnpm link --global
-agentscope --help
-```
-
-## Usage / V0 demo flow
-
-Run these from the root of a project that is a **git repository**:
-
-```bash
-# 1. Set up AgentScope in the project
-agentscope init
-
-# 2. Generate and approve a scope for your task
-agentscope start "Fix login redirect bug"
-#   → shows the inferred contract
-#   → Approve? [Y/n/e]
-#       Y / Enter  approve and write the scope
-#       n          abort, write nothing
-#       e          write the scope, then edit .agentscope/current-scope.yaml by hand
-
-# 3. Review the active scope at any time
-agentscope show
-
-# 4. Make some changes, then check them against the scope
-agentscope check
-```
-
-Example `agentscope check` output:
-
-```
-AgentScope Check
-
-Task: Fix login redirect bug
-
-Changed files:
-✅ src/auth/login.ts
-   within allowed paths: src/auth/**
-✅ tests/auth/login.test.ts
-   within allowed paths: tests/auth/**
-⚠ package.json
-   high risk path: package.json
-❌ .github/workflows/deploy.yml
-   blocked path: .github/**
-
-Summary:
-  ✅ OK:         2
-  ⚠ Warnings:   1
-  ❌ Violations: 1
-
-Result:
-FAILED
-```
-
-Exit codes (designed so this can later gate CI):
-
-- **violation present** → exit code `1`
-- **only warnings** → exit code `0`
-- **all OK / no changes** → exit code `0`
-
-## Dry-run Claude Code hook (V1.1, experimental)
+## Dry-run Claude Code hook
 
 You can preview how the policy engine would respond to a Claude Code tool call without installing anything. The command reads a `PreToolUse` payload from stdin and prints a Claude Code hook response:
 
@@ -142,9 +125,9 @@ It reads the active `.agentscope/current-scope.yaml` and `config.yaml` from the 
 
 This is a **dry-run only**. To wire it into a live Claude Code session, install it (see below).
 
-## Governing Claude Code (V1.2 — done)
+## Governing Claude Code
 
-**Status: complete.** The Claude Code PreToolUse hook now supports **live runtime enforcement**. `agentscope install claude-code` registers AgentScope's PreToolUse hook in your Claude Code settings. Once installed, Claude Code calls `agentscope hook claude-code pre-tool-use` before every `Read` / `Edit` / `Write` / `Bash` tool use, and AgentScope returns `allow` / `ask` / `deny` based on the active scope.
+The Claude Code PreToolUse hook provides **live runtime enforcement**. `agentscope install claude-code` registers AgentScope's PreToolUse hook in your Claude Code settings. Once installed, Claude Code calls `agentscope hook claude-code pre-tool-use` before every `Read` / `Edit` / `Write` / `Bash` tool use, and AgentScope returns `allow` / `ask` / `deny` based on the active scope.
 
 ```bash
 agentscope init
@@ -198,7 +181,7 @@ Uninstall removes **only** the AgentScope hook, leaving your other hooks intact.
 
 The installed hook runs the bare command `agentscope hook claude-code pre-tool-use`, which requires the `agentscope` CLI to be on your `PATH`. Install it globally (`pnpm link --global` from this repo, or a published package once available) so Claude Code can invoke it. If `agentscope` is not on `PATH`, the hook will fail to run — adjust the command in your settings to an absolute path or a `pnpm`-prefixed invocation if needed.
 
-## Evidence (V1.3 — done)
+## Evidence
 
 Every live policy decision is recorded to a local audit artifact so there is a verifiable trail of what the agent asked to do and what AgentScope decided. After a decision is made, the hook appends an **EvidenceEvent** to `.agentscope/evidence/latest.json`.
 
@@ -210,7 +193,7 @@ The evidence records **governance metadata only** — it never captures file con
 agentscope evidence show          # human-readable summary of recorded decisions
 agentscope evidence show --json   # the raw latest.json
 agentscope evidence clear         # delete latest.json (safe no-op if absent)
-agentscope report                 # V1.3 audit summary: counts, denied + asked actions
+agentscope report                 # audit summary: counts, denied + asked actions, risk score
 ```
 
 ### What gets written
@@ -247,7 +230,7 @@ The `scope_hash` is a `sha256` over a canonical snapshot of the scope (task id/t
 
 Writes are atomic (temp file + rename) so an interrupted write never corrupts `latest.json`.
 
-## Risk Score (V1.4 — done)
+## Risk Score
 
 `agentscope risk` reads the Evidence Package and computes a **deterministic, explainable** risk score. It is a pure function of the evidence: same evidence in, same score out — no LLM, no network, no clock, no file-content inspection. It never changes hook enforcement.
 
@@ -296,10 +279,10 @@ The total is clamped to `0–100`. Recommendations are derived deterministically
   scopes/
     <task-id>.yaml       # a per-task snapshot of each approved scope
   evidence/
-    latest.json          # V1.3 Evidence Package (live policy decisions)
+    latest.json          # Evidence Package (live policy decisions)
 ```
 
-The risk score (V1.4) is computed on demand from `latest.json`; it is not persisted. AgentScope never reads the *contents* of your source or secret files — it only matches file **paths** against glob patterns, and evidence stores only governance metadata.
+The risk score is computed on demand from `latest.json`; it is not persisted. AgentScope never reads the *contents* of your source or secret files — it only matches file **paths** against glob patterns, and evidence stores only governance metadata.
 
 ## Not supported yet
 
@@ -314,7 +297,7 @@ These are planned for later milestones and are **not implemented yet**:
 - Multi-agent governance (Cursor / Codex / Gemini), MCP-specific handling — *V5*
 - Web UI / dashboard, cloud services, LLM-based inference — later / out of scope
 
-Note: `agentscope check` still inspects the resulting `git` diff after the fact. The V1.2 Claude Code hook adds *live* enforcement during a session, but the two are complementary — the diff check does not require any agent integration.
+Note: `agentscope check` still inspects the resulting `git` diff after the fact. The Claude Code hook adds *live* enforcement during a session, but the two are complementary — the diff check does not require any agent integration.
 
 ## Development
 
@@ -339,8 +322,8 @@ src/
     git/                 # changed-files via git
     check/               # scope check logic
     policy/              # centralized path matching (picomatch)
-    evidence/            # V1.3 Evidence Package: schema, scope-hash, store, recorder
-    risk/                # V1.4 Risk Score: schema, engine, recommendations
+    evidence/            # Evidence Package: schema, scope-hash, store, recorder
+    risk/                # Risk Score: schema, engine, recommendations
     fs/                  # project path resolution
   cli/                   # Commander entrypoint + command orchestration
     commands/            # init, start, show, check, install, evidence, report, risk
@@ -349,8 +332,11 @@ docs/
   product-vision.md
   v0-v6-roadmap.md
   architecture.md
+
+examples/
+  live-demo/             # reproducible deny / ask / allow walkthrough
 ```
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

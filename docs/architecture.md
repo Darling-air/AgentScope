@@ -14,9 +14,63 @@ AgentScope 的架构必须支持以下长期目标：
 8. 默认本地运行，避免不必要 token 消耗
 9. 后续可扩展到 GitHub Action、Team Policy Registry、多 agent、企业审计
 
-## 2. 总体模块
+## 2. 当前真实架构（截至 V1.5）
 
-推荐 monorepo 结构：
+当前项目是 **single-package layout**（不是 monorepo），core 与 cli 分离。下面是实际存在并已实现的模块：
+
+```txt
+src/
+  core/                      # 确定性、可测试、无 CLI/agent 依赖
+    schema/                  # Zod schema：ScopeContract、config
+    scope/                   # task-id、scope inference（V0 确定性规则）、scope 读写
+    config/                  # 默认 config + loader
+    git/                     # 通过 git 获取 changed files
+    check/                   # git diff scope check
+    policy/                  # PolicyEngine + path/command matcher（ToolEvent → PolicyDecision）
+    events/                  # ToolEvent schema
+    evidence/                # Evidence Package：schema、scope-hash、store、recorder、summary
+    risk/                    # Risk Score：schema、engine、recommendations
+    fs/                      # 项目路径解析
+    adapters/
+      claude-code/           # PreToolUse payload/translator、hook entrypoint、settings installer、path normalizer
+  cli/                       # Commander 入口 + 命令编排
+    commands/                # init、start、show、check、hook、install、uninstall、evidence、report、risk
+
+docs/
+  product-vision.md
+  v0-v6-roadmap.md
+  architecture.md
+
+examples/
+  live-demo/                 # 可复现的 deny / ask / allow 演示
+
+.agentscope/                 # 运行时在用户项目中生成
+  config.yaml
+  current-scope.yaml
+  scopes/
+  evidence/
+    latest.json
+```
+
+实际运行链路（已实现）：
+
+```txt
+CLI
+→ Scope inference (V0, 本地确定性)
+→ ScopeContract (.agentscope/current-scope.yaml)
+→ Human approval
+→ Claude Code adapter (PreToolUse hook)
+→ ToolEvent
+→ PolicyEngine → PolicyDecision (allow / deny / ask)
+→ Evidence store (.agentscope/evidence/latest.json)
+→ Risk engine (agentscope risk / report，按需读取 evidence)
+```
+
+**尚未实现（planned）：** Policy Gate、GitHub Action、diff_hash / transcript_hash / evidence_hash、Team Policy Registry、多 agent adapter。下文第 11 节的 GitHub Action 与第 8 节的额外 hashes 属于 V3 规划，不是当前状态。
+
+## 2b. 长期目标模块（规划，未实现）
+
+下面是长期可能演进到的 monorepo 结构，仅作方向参考，**当前并未采用**：
 
 packages/
   cli/

@@ -1,15 +1,26 @@
 {
   "name": "agentscope",
-  "version": "0.0.0",
-  "description": "Least-privilege, task-scoped governance layer for AI coding agents (V0 prototype).",
+  "version": "0.1.0",
+  "description": "Task-scoped runtime governance for AI coding agents",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "agentscope": "dist/index.js"
+    "agentscope": "./dist/index.js"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "ai",
+    "agents",
+    "claude-code",
+    "governance",
+    "security",
+    "policy",
+    "audit",
+    "developer-tools"
   ],
   "engines": {
     "node": ">=18"

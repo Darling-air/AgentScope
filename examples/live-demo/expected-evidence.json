@@ -1,0 +1,166 @@
+{
+  "version": "0.1",
+  "task": {
+    "id": "fix-login-redirect-bug",
+    "title": "Fix login redirect bug",
+    "raw_input": "Fix login redirect bug"
+  },
+  "scope": {
+    "scope_hash": "sha256:be8af5fd67cb37b04c93ff0969d39a76b335b594719a64a482178ac0d5132165",
+    "allowed_paths": [
+      "src/auth/**",
+      "tests/auth/**",
+      "src/**",
+      "tests/**",
+      "__tests__/**"
+    ],
+    "blocked_paths": [
+      ".env*",
+      "secrets/**",
+      "migrations/**",
+      ".github/**",
+      "infra/**"
+    ],
+    "allowed_commands": [
+      "npm test",
+      "npm run lint"
+    ],
+    "high_risk": [
+      "package.json",
+      "package-lock.json",
+      "pnpm-lock.yaml",
+      "yarn.lock"
+    ]
+  },
+  "events": [
+    {
+      "id": "<session-id>:event-1",
+      "timestamp": "<timestamp>",
+      "agent": {
+        "name": "claude-code",
+        "session_id": "<session-id>",
+        "transcript_path": "<transcript-path>"
+      },
+      "tool_event": {
+        "id": "<session-id>:event-1",
+        "timestamp": "<timestamp>",
+        "agent": "claude-code",
+        "event_type": "tool_call",
+        "tool_source": "builtin",
+        "tool_name": "Read",
+        "action": "read",
+        "target": ".env.local"
+      },
+      "policy_decision": {
+        "decision": "deny",
+        "reason": ".env.local matches blocked path .env*",
+        "matched_rule": "blocked_paths:.env*",
+        "risk_delta": 20
+      }
+    },
+    {
+      "id": "<session-id>:event-2",
+      "timestamp": "<timestamp>",
+      "agent": {
+        "name": "claude-code",
+        "session_id": "<session-id>",
+        "transcript_path": "<transcript-path>"
+      },
+      "tool_event": {
+        "id": "<session-id>:event-2",
+        "timestamp": "<timestamp>",
+        "agent": "claude-code",
+        "event_type": "tool_call",
+        "tool_source": "builtin",
+        "tool_name": "Write",
+        "action": "write",
+        "target": "package.json"
+      },
+      "policy_decision": {
+        "decision": "ask",
+        "reason": "package.json matches high risk path package.json",
+        "matched_rule": "high_risk:package.json",
+        "risk_delta": 25
+      }
+    },
+    {
+      "id": "<session-id>:event-3",
+      "timestamp": "<timestamp>",
+      "agent": {
+        "name": "claude-code",
+        "session_id": "<session-id>",
+        "transcript_path": "<transcript-path>"
+      },
+      "tool_event": {
+        "id": "<session-id>:event-3",
+        "timestamp": "<timestamp>",
+        "agent": "claude-code",
+        "event_type": "tool_call",
+        "tool_source": "builtin",
+        "tool_name": "Edit",
+        "action": "edit",
+        "target": "src/auth/login.ts"
+      },
+      "policy_decision": {
+        "decision": "allow",
+        "reason": "src/auth/login.ts matches allowed path src/auth/**",
+        "matched_rule": "allowed_paths:src/auth/**",
+        "risk_delta": -10
+      }
+    }
+  ],
+  "policy_interventions": [
+    {
+      "id": "<session-id>:event-1",
+      "timestamp": "<timestamp>",
+      "agent": {
+        "name": "claude-code",
+        "session_id": "<session-id>",
+        "transcript_path": "<transcript-path>"
+      },
+      "tool_event": {
+        "id": "<session-id>:event-1",
+        "timestamp": "<timestamp>",
+        "agent": "claude-code",
+        "event_type": "tool_call",
+        "tool_source": "builtin",
+        "tool_name": "Read",
+        "action": "read",
+        "target": ".env.local"
+      },
+      "policy_decision": {
+        "decision": "deny",
+        "reason": ".env.local matches blocked path .env*",
+        "matched_rule": "blocked_paths:.env*",
+        "risk_delta": 20
+      }
+    },
+    {
+      "id": "<session-id>:event-2",
+      "timestamp": "<timestamp>",
+      "agent": {
+        "name": "claude-code",
+        "session_id": "<session-id>",
+        "transcript_path": "<transcript-path>"
+      },
+      "tool_event": {
+        "id": "<session-id>:event-2",
+        "timestamp": "<timestamp>",
+        "agent": "claude-code",
+        "event_type": "tool_call",
+        "tool_source": "builtin",
+        "tool_name": "Write",
+        "action": "write",
+        "target": "package.json"
+      },
+      "policy_decision": {
+        "decision": "ask",
+        "reason": "package.json matches high risk path package.json",
+        "matched_rule": "high_risk:package.json",
+        "risk_delta": 25
+      }
+    }
+  ],
+  "created_at": "<timestamp>",
+  "updated_at": "<timestamp>"
+}

@@ -1,0 +1,27 @@
+$ agentscope risk
+
+AgentScope Risk (V1.4)
+
+Risk score: 55 / 100
+Risk level: high
+Task:       Fix login redirect bug (fix-login-redirect-bug)
+Scope hash: sha256:be8af5fd67cb37b04c93ff0969d39a76b335b594719a64a482178ac0d5132165
+
+Event counts:
+  Total: 3
+  allow: 1
+  deny:  1
+  ask:   1
+  warn:  0
+  interventions: 2
+
+Top risk factors:
+  [+25] High-risk change required approval package.json
+  [+20] Blocked path access was denied .env.local
+  [+10] Both blocked-path and high-risk activity occurred
+
+Recommendations:
+  - Review why the agent attempted to access blocked paths.
+  - Manually review high-risk file changes before merging.
+
+Evidence path: <project>/.agentscope/evidence/latest.json

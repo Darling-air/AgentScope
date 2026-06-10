@@ -22,6 +22,25 @@ Task
 → Risk Scoring
 → Policy Gate
 
+## 当前进度概览
+
+```txt
+V0    ✅ done    本地 Task Scope Contract + git diff check
+V1.0  ✅ done    Core Policy Engine (ToolEvent → PolicyDecision)
+V1.1  ✅ done    Claude Code PreToolUse translator + hook entrypoint
+V1.2  ✅ done    Claude Code hook installer + live runtime enforcement
+V1.3  ✅ done    Evidence Event Recorder
+V1.4  ✅ done    Deterministic Risk Score V1
+V1.5  ▶ current  GitHub-ready demo polish (README / examples / docs / packaging)
+V2    ⏳ planned Scope Auto Inference 深化
+V3    ⏳ planned Evidence + Policy Gate + GitHub Action
+V4    ⏳ planned Team Policy Registry
+V5    ⏳ planned Multi-Agent Governance
+V6    ⏳ planned Enterprise Governance
+```
+
+Policy Gate 和 GitHub Action 仍属于 V3，**尚未实现**。V1.5 不新增治理功能，只做文档、examples、demo、CLI help 和 packaging polish。
+
 ## V0：本地原型版
 
 ### 目标
