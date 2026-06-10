@@ -6,13 +6,17 @@ AgentScope turns a single natural-language coding task into an explicit, auditab
 
 > AgentScope = Least-privilege sessions for AI coding agents.
 
-This repository is currently at **V0**: a local, deterministic prototype. There is no LLM call and no network access.
+This repository started as a local, deterministic prototype (**V0**) and has grown an agent-agnostic policy engine plus live Claude Code enforcement. There is still no LLM call and no network access.
 
-> V1 development is underway with an agent-agnostic policy engine foundation — the internal `PolicyEngine` (`ToolEvent` → `PolicyDecision`) that agent adapters build on.
+> The agent-agnostic foundation is the internal `PolicyEngine` (`ToolEvent` → `PolicyDecision`) that agent adapters build on.
 >
 > **V1.1** added a *dry-run* Claude Code hook translator: `agentscope hook claude-code pre-tool-use` reads a Claude Code `PreToolUse` payload from stdin and emits a hook response on stdout.
 >
-> **V1.2** adds the **Claude Code hook installer**: `agentscope install claude-code` registers the PreToolUse hook in your Claude Code settings so a live session is actually governed by the active scope. Still **not** implemented: Evidence Package, Risk Scoring, and the GitHub Action / PR Policy Gate.
+> **V1.2 — done.** The **Claude Code hook installer** is complete: `agentscope install claude-code` registers the PreToolUse hook in your Claude Code settings, so a live Claude Code session is now governed by the active scope in real time. `Read` / `Edit` / `Write` / `Bash` are enforced at runtime against the Task Scope Contract.
+>
+> **V1.3 — done.** The **Evidence Event Recorder** is complete: every live policy decision is appended to a local audit artifact at `.agentscope/evidence/latest.json`, and `agentscope evidence show` / `agentscope report` summarize it.
+>
+> **V1.4 — done.** **Risk Score V1** is complete: `agentscope risk` reads the Evidence Package and computes a deterministic, explainable 0–100 risk score with per-factor breakdown and recommendations, and `agentscope report` now includes that score. This is a read-only summary — it is **not** a policy gate, sets no failing exit code, and never changes hook enforcement. Still **not** implemented: the GitHub Action / PR Policy Gate (V3).
 
 ## What V0 can do
 
@@ -138,9 +142,9 @@ It reads the active `.agentscope/current-scope.yaml` and `config.yaml` from the 
 
 This is a **dry-run only**. To wire it into a live Claude Code session, install it (see below).
 
-## Governing Claude Code (V1.2)
+## Governing Claude Code (V1.2 — done)
 
-`agentscope install claude-code` registers AgentScope's PreToolUse hook in your Claude Code settings. Once installed, Claude Code calls `agentscope hook claude-code pre-tool-use` before every `Read` / `Edit` / `Write` / `Bash` tool use, and AgentScope returns `allow` / `ask` / `deny` based on the active scope.
+**Status: complete.** The Claude Code PreToolUse hook now supports **live runtime enforcement**. `agentscope install claude-code` registers AgentScope's PreToolUse hook in your Claude Code settings. Once installed, Claude Code calls `agentscope hook claude-code pre-tool-use` before every `Read` / `Edit` / `Write` / `Bash` tool use, and AgentScope returns `allow` / `ask` / `deny` based on the active scope.
 
 ```bash
 agentscope init
@@ -149,7 +153,21 @@ agentscope install claude-code
 claude
 ```
 
-Now, if Claude tries to read `.env.local`, the hook returns `deny` (because `.env*` is a blocked path in the scope), and Claude Code blocks the read. Editing `package.json` returns `ask` (high-risk), editing `src/auth/login.ts` returns `allow`, and `rm -rf node_modules` returns `deny` (dangerous command).
+### Live demo
+
+With the scope for "Fix login redirect bug" active and the hook installed, here is what Claude Code sees during a real session:
+
+| Claude Code tool use | AgentScope decision | Why |
+| --- | --- | --- |
+| `Read` `.env.local` | ❌ **deny** | `.env*` is a blocked path |
+| `Edit` `package.json` | ⚠ **ask** | high-risk path — needs human confirmation |
+| `Edit` `src/auth/login.ts` | ✅ **allow** | within `src/auth/**` allowed paths |
+
+A `deny` blocks the tool use outright, and an `ask` pauses for the human to approve or reject — so the agent stays inside the Task Scope Contract for the whole session. (`Bash` commands like `rm -rf node_modules` are also `deny`'d as dangerous commands.)
+
+### Path normalization (Windows / POSIX)
+
+Claude Code may pass a `file_path` as either a relative path (`.env.local`) or an absolute one — Windows (`G:\AgentScope\.env.local`) or POSIX (`G:/AgentScope/.env.local`). Scope globs are written repo-relative with forward slashes, so AgentScope normalizes every incoming target before matching: absolute paths under the project root are made **repo-relative**, backslashes become forward slashes, and Windows drive letters are compared case-insensitively. A path outside the project root is normalized but left absolute (never crashes, never wrongly collapses). This keeps enforcement consistent across Windows, macOS, and Linux.
 
 ### Where it writes
 
@@ -180,6 +198,95 @@ Uninstall removes **only** the AgentScope hook, leaving your other hooks intact.
 
 The installed hook runs the bare command `agentscope hook claude-code pre-tool-use`, which requires the `agentscope` CLI to be on your `PATH`. Install it globally (`pnpm link --global` from this repo, or a published package once available) so Claude Code can invoke it. If `agentscope` is not on `PATH`, the hook will fail to run — adjust the command in your settings to an absolute path or a `pnpm`-prefixed invocation if needed.
 
+## Evidence (V1.3 — done)
+
+Every live policy decision is recorded to a local audit artifact so there is a verifiable trail of what the agent asked to do and what AgentScope decided. After a decision is made, the hook appends an **EvidenceEvent** to `.agentscope/evidence/latest.json`.
+
+Recording is **best-effort**: if writing evidence fails for any reason, the hook still returns its normal `allow` / `ask` / `deny` response. Evidence never breaks enforcement, and the hook still emits only the response JSON on stdout. When there is no active scope (the safe-`ask` case), nothing is recorded because there is no task/scope snapshot to attach it to.
+
+The evidence records **governance metadata only** — it never captures file contents, command output, or the agent's reply text.
+
+```bash
+agentscope evidence show          # human-readable summary of recorded decisions
+agentscope evidence show --json   # the raw latest.json
+agentscope evidence clear         # delete latest.json (safe no-op if absent)
+agentscope report                 # V1.3 audit summary: counts, denied + asked actions
+```
+
+### What gets written
+
+`.agentscope/evidence/latest.json` is an **EvidencePackage**:
+
+```jsonc
+{
+  "version": "0.1",
+  "task": { "id": "...", "title": "...", "raw_input": "..." },
+  "scope": {
+    "scope_hash": "sha256:...",        // stable hash of the governing scope
+    "allowed_paths": [], "blocked_paths": [],
+    "allowed_commands": [], "high_risk": []
+  },
+  "events": [                          // every allow / deny / ask / warn
+    {
+      "id": "...", "timestamp": "...",
+      "agent": { "name": "claude-code", "session_id": "...", "transcript_path": "..." },
+      "tool_event": { /* ToolEvent: tool_name, action, target/command */ },
+      "policy_decision": { "decision": "deny", "reason": "...", "matched_rule": "..." }
+    }
+  ],
+  "policy_interventions": [],          // projection of non-allow events only
+  "created_at": "...", "updated_at": "..."
+}
+```
+
+The `scope_hash` is a `sha256` over a canonical snapshot of the scope (task id/title + the four path/command arrays). Object key order does not change it; array order is preserved, since scope ordering can be meaningful. On each decision the recorder:
+
+- creates a new package if `latest.json` does not exist,
+- **appends** the event when the current scope's `scope_hash` matches, or
+- **resets** the package (new `latest.json`) when the `scope_hash` differs — so events are never mixed across scopes.
+
+Writes are atomic (temp file + rename) so an interrupted write never corrupts `latest.json`.
+
+## Risk Score (V1.4 — done)
+
+`agentscope risk` reads the Evidence Package and computes a **deterministic, explainable** risk score. It is a pure function of the evidence: same evidence in, same score out — no LLM, no network, no clock, no file-content inspection. It never changes hook enforcement.
+
+```bash
+agentscope risk          # human-readable score, factors, and recommendations
+agentscope risk --json   # the full RiskScoreV1 JSON
+```
+
+The score is `0–100`, mapped to a level:
+
+| Score | Level |
+| --- | --- |
+| 0–24 | low |
+| 25–49 | medium |
+| 50–74 | high |
+| 75–100 | critical |
+
+### How the score is computed
+
+Each event contributes points; every non-zero contribution becomes a **factor** so the score is traceable back to specific actions.
+
+Per-event:
+
+- **deny** → `max(risk_delta, 15)`; `dangerous_commands:*` rule → at least 40; `blocked_paths:*` rule → at least 20
+- **ask** → `max(risk_delta, 8)`; `high_risk:*` rule → at least 25; a write/edit with no matched rule → at least 15
+- **warn** → `max(risk_delta, 5)`
+- **allow** → 0, unless it carries a *positive* `risk_delta` (a negative `risk_delta` never pushes the total below 0)
+
+Session-level (added once if the condition holds):
+
+- ≥ 3 policy interventions → +10
+- ≥ 2 denies → +10
+- both a blocked-path and a high-risk intervention occurred → +10
+- a dangerous command was attempted → +15
+
+The total is clamped to `0–100`. Recommendations are derived deterministically from which factors fired (e.g. a `blocked_path_denied` factor yields "Review why the agent attempted to access blocked paths."). When nothing risky fired, the recommendation is "No major policy concerns detected in this session."
+
+> **Not a policy gate.** `agentscope risk` and `agentscope report` are read-only summaries. They never set a failing exit code, apply no threshold, and do not fail CI. A CI Policy Gate is a later milestone (V3).
+
 ## Files AgentScope writes
 
 ```
@@ -188,19 +295,21 @@ The installed hook runs the bare command `agentscope hook claude-code pre-tool-u
   current-scope.yaml     # the active Task Scope Contract
   scopes/
     <task-id>.yaml       # a per-task snapshot of each approved scope
-  evidence/              # reserved for V1+ (currently unused)
+  evidence/
+    latest.json          # V1.3 Evidence Package (live policy decisions)
 ```
 
-AgentScope never reads the *contents* of your source or secret files — it only matches file **paths** against glob patterns.
+The risk score (V1.4) is computed on demand from `latest.json`; it is not persisted. AgentScope never reads the *contents* of your source or secret files — it only matches file **paths** against glob patterns, and evidence stores only governance metadata.
 
 ## Not supported yet
 
-These are planned for later milestones:
+These are planned for later milestones and are **not implemented yet**:
 
-- ✅ Claude Code PreToolUse hook + installer — *done in V1.0–V1.2*
-- Evidence Package (full schema + hashes) — *V1.3 / V3*
-- Risk Scoring (`agentscope risk`) — *V1.3*
-- GitHub Action / Policy Gate in CI — *V3*
+- ✅ Claude Code PreToolUse hook + installer with live runtime enforcement — *done in V1.0–V1.2*
+- ✅ Evidence Event Recorder (`evidence show` / `clear`, `report`) — *done in V1.3*
+- ✅ Risk Score V1 (`agentscope risk`) — *done in V1.4*
+- ❌ GitHub Action / Policy Gate in CI (threshold, exit codes) — *not yet, V3*
+- ❌ Evidence hashes (diff/transcript), signed evidence — *not yet, V3*
 - Team Policy Registry & templates — *V4*
 - Multi-agent governance (Cursor / Codex / Gemini), MCP-specific handling — *V5*
 - Web UI / dashboard, cloud services, LLM-based inference — later / out of scope
@@ -230,9 +339,11 @@ src/
     git/                 # changed-files via git
     check/               # scope check logic
     policy/              # centralized path matching (picomatch)
+    evidence/            # V1.3 Evidence Package: schema, scope-hash, store, recorder
+    risk/                # V1.4 Risk Score: schema, engine, recommendations
     fs/                  # project path resolution
   cli/                   # Commander entrypoint + command orchestration
-    commands/            # init, start, show, check
+    commands/            # init, start, show, check, install, evidence, report, risk
 
 docs/
   product-vision.md

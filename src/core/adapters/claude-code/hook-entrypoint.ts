@@ -12,6 +12,11 @@ import {
   evaluateToolEvent,
   DEFAULT_DANGEROUS_COMMANDS,
 } from "../../policy/policy-engine.js";
+import { buildEvidenceEvent, recordEvidence } from "../../evidence/index.js";
+import type { ScopeContract } from "../../schema/scope-contract.js";
+import type { ToolEvent } from "../../events/tool-event.js";
+import type { PolicyDecision } from "../../policy/policy-decision.js";
+import type { ClaudePreToolUsePayload } from "./pre-tool-use-payload.js";
 
 /**
  * Dry-run Claude Code PreToolUse hook entrypoint.
@@ -80,7 +85,43 @@ export async function runClaudePreToolUseHook(
   });
 
   const decision = evaluateToolEvent(scope, event, { dangerousCommands });
+
+  // 6. Best-effort: append an evidence event. This must never affect the
+  // returned response, so any failure is swallowed silently here.
+  recordEvidenceBestEffort(paths.evidenceLatestFile, scope, event, decision, payload);
+
   return mapPolicyDecisionToClaudeHookResponse(decision);
+}
+
+/**
+ * Records one evidence event for this decision. Deliberately swallows every
+ * error: evidence is an audit side effect and must never break enforcement or
+ * change the hook response. Nothing is written to stdout/stderr here.
+ */
+function recordEvidenceBestEffort(
+  latestFile: string,
+  scope: ScopeContract,
+  toolEvent: ToolEvent,
+  decision: PolicyDecision,
+  payload: ClaudePreToolUsePayload,
+): void {
+  try {
+    const now = new Date().toISOString();
+    const evidenceEvent = buildEvidenceEvent({
+      id: toolEvent.id,
+      timestamp: toolEvent.timestamp,
+      agent: {
+        name: "claude-code",
+        session_id: payload.session_id,
+        transcript_path: payload.transcript_path,
+      },
+      toolEvent,
+      decision,
+    });
+    recordEvidence({ latestFile, scope, event: evidenceEvent, now });
+  } catch {
+    // Never let evidence recording affect the hook response.
+  }
 }
 
 /** Builds a best-effort unique event id; the value is not security-sensitive. */

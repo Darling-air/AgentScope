@@ -6,6 +6,12 @@ import { checkCommand } from "./commands/check.js";
 import { hookClaudeCodePreToolUseCommand } from "./commands/hook.js";
 import { installClaudeCodeCommand } from "./commands/install.js";
 import { uninstallClaudeCodeCommand } from "./commands/uninstall.js";
+import {
+  evidenceShowCommand,
+  evidenceClearCommand,
+} from "./commands/evidence.js";
+import { reportCommand } from "./commands/report.js";
+import { riskCommand } from "./commands/risk.js";
 import { color } from "./ui.js";
 
 const program = new Command();
@@ -90,6 +96,43 @@ uninstall
   .option("--shared", "Target .claude/settings.json instead of settings.local.json")
   .action((options: { shared?: boolean }) => {
     uninstallClaudeCodeCommand(options);
+  });
+
+// `agentscope evidence show|clear`
+const evidence = program
+  .command("evidence")
+  .description("Inspect or clear the local Evidence Package");
+
+evidence
+  .command("show")
+  .description("Show a summary of recorded policy decisions")
+  .option("--json", "Print the raw evidence JSON instead of a summary")
+  .action((options: { json?: boolean }) => {
+    evidenceShowCommand(options);
+  });
+
+evidence
+  .command("clear")
+  .description("Delete .agentscope/evidence/latest.json")
+  .action(() => {
+    evidenceClearCommand();
+  });
+
+// `agentscope report`
+program
+  .command("report")
+  .description("Print a V1.3 audit summary from the Evidence Package")
+  .action(() => {
+    reportCommand();
+  });
+
+// `agentscope risk [--json]`
+program
+  .command("risk")
+  .description("Compute a deterministic risk score from the Evidence Package")
+  .option("--json", "Print the full RiskScoreV1 JSON instead of a summary")
+  .action((options: { json?: boolean }) => {
+    riskCommand(options);
   });
 
 async function main(): Promise<void> {

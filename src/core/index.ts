@@ -13,4 +13,6 @@ export * from "./policy/policy-decision.js";
 export * from "./policy/policy-engine.js";
 export * from "./events/tool-event.js";
 export * from "./fs/project-paths.js";
+export * from "./evidence/index.js";
+export * from "./risk/index.js";
 export * from "./adapters/claude-code/index.js";

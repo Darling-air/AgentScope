@@ -144,6 +144,23 @@ agentscope check
 
 ## V1：Claude Code MVP
 
+### 当前状态
+
+V1 拆分为 V1.0–V1.4 子阶段，进度如下：
+
+- ✅ **V1.0 已完成** — agent-agnostic policy engine（`ToolEvent` → `PolicyDecision`，PolicyEngine、CommandMatcher）。
+- ✅ **V1.1 已完成** — Claude Code PreToolUse payload schema + dry-run hook translator（`agentscope hook claude-code pre-tool-use`）。
+- ✅ **V1.2 已完成** — Claude Code hook installer。`agentscope install claude-code` 把 PreToolUse hook 安全注入 Claude Code settings，实现 **live runtime enforcement**：Read / Edit / Write / Bash 在运行时受 Task Scope Contract 约束。
+  - 默认写入 `.claude/settings.local.json`，仅 `--shared` 才写入 `.claude/settings.json`。
+  - 支持 Windows / POSIX 绝对路径归一化为 repo-relative path，跨平台 glob 匹配一致。
+  - live demo：Read `.env.local` → **deny**；Edit `package.json` → **ask**；Edit `src/auth/login.ts` → **allow**。
+- ✅ **V1.3 已完成** — Evidence Event Recorder + Evidence Package。每次 live policy decision 追加到 `.agentscope/evidence/latest.json`；`agentscope evidence show` / `evidence clear` / `report` 可用；仅记录 governance metadata。
+- ✅ **V1.4 已完成** — Risk Score V1。`agentscope risk` / `agentscope risk --json` 从 Evidence Package 计算确定性 0–100 风险分（low / medium / high / critical），附 per-factor 分解与 recommendations；`agentscope report` 现已包含 risk score。
+  - 纯函数 `calculateRiskScore`：同一 evidence 输入得到同一输出，不调 LLM、不联网、不依赖时间、不读文件内容、不改 hook 行为。
+  - **不是 Policy Gate**：risk / report 都不设非零 exit code、无 threshold、不 fail CI。Policy Gate 属于后续 V3。
+
+下面这一节 V1 的“必须实现”是原始 MVP 规划，现已全部落地：Event log / Evidence Package（V1.3）、Risk Scoring（V1.4）均已实现。仅 GitHub Action / Policy Gate 仍属于 V3，尚未实现。
+
 ### 目标
 
 做出第一个可开源发布、可录制 demo 的版本。

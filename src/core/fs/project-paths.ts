@@ -11,17 +11,20 @@ export interface ProjectPaths {
   currentScopeFile: string;
   scopesDir: string;
   evidenceDir: string;
+  evidenceLatestFile: string;
 }
 
 export function getProjectPaths(root: string = process.cwd()): ProjectPaths {
   const agentscopeDir = path.join(root, ".agentscope");
+  const evidenceDir = path.join(agentscopeDir, "evidence");
   return {
     root,
     agentscopeDir,
     configFile: path.join(agentscopeDir, "config.yaml"),
     currentScopeFile: path.join(agentscopeDir, "current-scope.yaml"),
     scopesDir: path.join(agentscopeDir, "scopes"),
-    evidenceDir: path.join(agentscopeDir, "evidence"),
+    evidenceDir,
+    evidenceLatestFile: path.join(evidenceDir, "latest.json"),
   };
 }
 
