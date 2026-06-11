@@ -79,6 +79,7 @@ export function reportCommand(): void {
 
   console.log(color.dim(`Evidence path: ${paths.evidenceLatestFile}`));
   console.log(color.dim("Run `agentscope risk` for the full risk breakdown."));
+  console.log(color.dim("Policy gate: run `agentscope gate` to enforce thresholds."));
   console.log("");
 }
 

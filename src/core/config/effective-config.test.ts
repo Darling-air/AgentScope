@@ -54,6 +54,7 @@ describe("normalizeConfig", () => {
     const cfg = normalizeConfig(parse({ version: 1 }));
     expect(cfg.policy.blocked_paths).toEqual(BUILTIN_DEFAULTS.policy.blocked_paths);
     expect(cfg.inference.confidence_threshold).toBe(0.65);
+    expect(cfg.gate).toEqual(BUILTIN_DEFAULTS.gate);
   });
 
   it("applies policy add/remove patches", () => {
@@ -105,5 +106,62 @@ describe("normalizeConfig", () => {
       }),
     );
     expect(cfg.policy.blocked_paths).toEqual([".env*", "private/**"]);
+  });
+
+  it("fills missing gate config with defaults", () => {
+    const cfg = normalizeConfig(parse({ version: 1 }));
+    expect(cfg.gate.enabled).toBe(true);
+    expect(cfg.gate.risk.max_score).toBe(74);
+    expect(cfg.gate.risk.max_level).toBe("high");
+    expect(cfg.gate.decisions.max_denies).toBe(0);
+    expect(cfg.gate.decisions.max_asks).toBe(10);
+    expect(cfg.gate.decisions.allow_warnings).toBe(true);
+    expect(cfg.gate.rules.fail_on_blocked_path).toBe(true);
+    expect(cfg.gate.rules.fail_on_dangerous_command).toBe(true);
+    expect(cfg.gate.rules.fail_on_high_risk_without_review).toBe(false);
+  });
+
+  it("fills partial gate config with defaults", () => {
+    const cfg = normalizeConfig(
+      parse({
+        version: 1,
+        gate: {
+          risk: { max_score: 50 },
+          decisions: { max_denies: 2 },
+        },
+      }),
+    );
+    expect(cfg.gate.risk.max_score).toBe(50);
+    expect(cfg.gate.risk.max_level).toBe("high");
+    expect(cfg.gate.decisions.max_denies).toBe(2);
+    expect(cfg.gate.decisions.max_asks).toBe(10);
+    expect(cfg.gate.rules.fail_on_blocked_path).toBe(true);
+  });
+
+  it("parses all gate overrides", () => {
+    const cfg = normalizeConfig(
+      parse({
+        version: 1,
+        gate: {
+          enabled: false,
+          risk: { max_score: 40, max_level: "medium" },
+          decisions: { max_denies: 3, max_asks: 4, allow_warnings: false },
+          rules: {
+            fail_on_blocked_path: false,
+            fail_on_dangerous_command: false,
+            fail_on_high_risk_without_review: true,
+          },
+        },
+      }),
+    );
+    expect(cfg.gate.enabled).toBe(false);
+    expect(cfg.gate.risk.max_score).toBe(40);
+    expect(cfg.gate.risk.max_level).toBe("medium");
+    expect(cfg.gate.decisions.max_denies).toBe(3);
+    expect(cfg.gate.decisions.max_asks).toBe(4);
+    expect(cfg.gate.decisions.allow_warnings).toBe(false);
+    expect(cfg.gate.rules.fail_on_blocked_path).toBe(false);
+    expect(cfg.gate.rules.fail_on_dangerous_command).toBe(false);
+    expect(cfg.gate.rules.fail_on_high_risk_without_review).toBe(true);
   });
 });

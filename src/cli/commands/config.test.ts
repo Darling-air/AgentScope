@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { configShowCommand, configValidateCommand } from "./config.js";
+import { initCommand } from "./init.js";
 import { getProjectPaths } from "../../core/fs/project-paths.js";
 import { DEFAULT_CONFIG_YAML } from "../../core/config/default-config.js";
 
@@ -62,6 +63,8 @@ describe("config show", () => {
     expect(text).toContain("Blocked paths:");
     expect(text).toContain(".env*");
     expect(text).toContain("Confidence threshold: 0.65");
+    expect(text).toContain("Gate policy:");
+    expect(text).toContain("Max score:");
   });
 
   it("works without a config file and notes defaults", () => {
@@ -80,6 +83,8 @@ describe("config show", () => {
     const parsed = JSON.parse(text);
     expect(parsed.config.policy.blocked_paths).toContain(".env*");
     expect(parsed.config.inference.confidence_threshold).toBe(0.65);
+    expect(parsed.config.gate.risk.max_score).toBe(74);
+    expect(parsed.config.gate.risk.max_level).toBe("high");
   });
 });
 
@@ -107,5 +112,33 @@ describe("config validate", () => {
     configValidateCommand();
     expect(process.exitCode).toBe(1);
     expect(out().toLowerCase()).toContain("invalid");
+  });
+
+  it("catches invalid gate config", () => {
+    const dir = makeProject();
+    writeConfig(
+      dir,
+      `version: 1
+gate:
+  risk:
+    max_score: -1
+`,
+    );
+    process.chdir(dir);
+    configValidateCommand();
+    expect(process.exitCode).toBe(1);
+    expect(out()).toContain("gate.risk.max_score");
+  });
+});
+
+describe("init", () => {
+  it("writes default gate config", () => {
+    const dir = makeProject(false);
+    process.chdir(dir);
+    initCommand();
+    const config = readFileSync(getProjectPaths(dir).configFile, "utf8");
+    expect(config).toContain("gate:");
+    expect(config).toContain("max_score: 74");
+    expect(config).toContain("fail_on_blocked_path: true");
   });
 });

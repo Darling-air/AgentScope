@@ -70,6 +70,41 @@ export const InferenceConfigSchema = z
   })
   .default({});
 
+export const GateRiskLevelSchema = z.enum([
+  "low",
+  "medium",
+  "high",
+  "critical",
+]);
+
+export const GateConfigSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    risk: z
+      .object({
+        max_score: z.number().min(0).max(100).default(74),
+        max_level: GateRiskLevelSchema.default("high"),
+      })
+      .default({}),
+    decisions: z
+      .object({
+        max_denies: z.number().int().min(0).default(0),
+        max_asks: z.number().int().min(0).default(10),
+        allow_warnings: z.boolean().default(true),
+      })
+      .default({}),
+    rules: z
+      .object({
+        fail_on_blocked_path: z.boolean().default(true),
+        fail_on_dangerous_command: z.boolean().default(true),
+        fail_on_high_risk_without_review: z.boolean().default(false),
+      })
+      .default({}),
+  })
+  .default({});
+
+export type GateConfig = z.infer<typeof GateConfigSchema>;
+
 /**
  * Legacy defaults block (V0/V2.0). Kept optional so old config files continue
  * to validate and contribute their values to the effective config.
@@ -98,6 +133,7 @@ export const AgentScopeConfigSchema = z.object({
     .default({ package_manager: "auto" }),
   policy: PolicyConfigSchema,
   inference: InferenceConfigSchema,
+  gate: GateConfigSchema,
   /** Legacy V0/V2.0 defaults block (still honored for back-compat). */
   defaults: LegacyDefaultsSchema.optional(),
 }).strict();

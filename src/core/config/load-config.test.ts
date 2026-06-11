@@ -140,6 +140,64 @@ inference:
     // everything else falls back to defaults
     expect(cfg.policy.blocked_paths).toContain(".env*");
     expect(cfg.inference.confidence_threshold).toBe(0.65);
+    expect(cfg.gate.risk.max_score).toBe(74);
+  });
+
+  it("loads partial gate config and fills defaults", () => {
+    const dir = makeProject();
+    writeConfig(
+      dir,
+      `version: 1
+gate:
+  enabled: false
+  risk:
+    max_level: medium
+  decisions:
+    allow_warnings: false
+`,
+    );
+    const cfg = loadConfig(getProjectPaths(dir));
+    expect(cfg.gate.enabled).toBe(false);
+    expect(cfg.gate.risk.max_score).toBe(74);
+    expect(cfg.gate.risk.max_level).toBe("medium");
+    expect(cfg.gate.decisions.max_denies).toBe(0);
+    expect(cfg.gate.decisions.max_asks).toBe(10);
+    expect(cfg.gate.decisions.allow_warnings).toBe(false);
+  });
+
+  it("rejects invalid gate max_level", () => {
+    const dir = makeProject();
+    writeConfig(
+      dir,
+      `version: 1
+gate:
+  risk:
+    max_level: severe
+`,
+    );
+    const r = loadConfigResult(getProjectPaths(dir));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.message).toContain("gate.risk.max_level");
+  });
+
+  it("rejects invalid gate thresholds", () => {
+    const dir = makeProject();
+    writeConfig(
+      dir,
+      `version: 1
+gate:
+  risk:
+    max_score: 101
+  decisions:
+    max_denies: -1
+`,
+    );
+    const r = loadConfigResult(getProjectPaths(dir));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.message).toContain("gate.risk.max_score");
+      expect(r.message).toContain("gate.decisions.max_denies");
+    }
   });
 
   it("supports legacy top-level defaults.dangerous_commands", () => {

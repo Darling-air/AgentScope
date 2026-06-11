@@ -51,4 +51,21 @@ inference:
   rule_packs:
     disabled: []
     overrides: {}
+
+gate:
+  enabled: true
+
+  risk:
+    max_score: 74
+    max_level: high
+
+  decisions:
+    max_denies: 0
+    max_asks: 10
+    allow_warnings: true
+
+  rules:
+    fail_on_blocked_path: true
+    fail_on_dangerous_command: true
+    fail_on_high_risk_without_review: false
 `;

@@ -100,6 +100,20 @@ function printHuman(
     }
   }
   console.log("");
+
+  console.log(color.cyan("Gate policy:"));
+  console.log(`  Enabled:                  ${c.gate.enabled}`);
+  console.log(`  Max score:                ${c.gate.risk.max_score}`);
+  console.log(`  Max level:                ${c.gate.risk.max_level}`);
+  console.log(`  Max denies:               ${c.gate.decisions.max_denies}`);
+  console.log(`  Max asks:                 ${c.gate.decisions.max_asks}`);
+  console.log(`  Allow warnings:           ${c.gate.decisions.allow_warnings}`);
+  console.log(`  Fail on blocked path:     ${c.gate.rules.fail_on_blocked_path}`);
+  console.log(`  Fail on dangerous command:${c.gate.rules.fail_on_dangerous_command}`);
+  console.log(
+    `  Fail high-risk no review: ${c.gate.rules.fail_on_high_risk_without_review}`,
+  );
+  console.log("");
 }
 
 export function configValidateCommand(): void {

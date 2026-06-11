@@ -12,6 +12,7 @@ import {
 } from "./commands/evidence.js";
 import { reportCommand } from "./commands/report.js";
 import { riskCommand } from "./commands/risk.js";
+import { gateCommand, type GateCommandOptions } from "./commands/gate.js";
 import {
   configShowCommand,
   configValidateCommand,
@@ -146,6 +147,16 @@ program
   .description("Print an audit summary (counts, denied/asked actions, risk score) from the Evidence Package")
   .action(() => {
     reportCommand();
+  });
+
+// `agentscope gate [--json] [--allow-missing-evidence]`
+program
+  .command("gate")
+  .description("Evaluate the local policy gate from evidence, risk, and config")
+  .option("--json", "Output the full GateResultV1 as JSON")
+  .option("--allow-missing-evidence", "Skip the gate when evidence/latest.json is missing")
+  .action((options: GateCommandOptions) => {
+    gateCommand(options);
   });
 
 // `agentscope risk [--json]`

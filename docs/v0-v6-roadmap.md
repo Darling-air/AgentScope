@@ -1,5 +1,18 @@
 # AgentScope V0-V6 Roadmap
 
+Current implementation status:
+
+```txt
+V2.2  done     Scope Review / Override UX
+V2.3  done     Multi-task Scope History
+V3.0  done     Local Policy Gate CLI (`agentscope gate`)
+V3.1  planned  GitHub Action
+V3.2  planned  SARIF / PR comments / CI report
+V4    planned  Team Policy Registry
+```
+
+V3.0 is local-only. It does not implement GitHub Action, SARIF, PR comments, remote/team policy, cloud sync, or branch protection integration.
+
 ## 总体路线
 
 AgentScope 的开发路线分为七个阶段：

@@ -1,6 +1,7 @@
 import type {
   AgentScopeConfig,
   AddRemove,
+  GateConfig,
   RulePackOverride,
 } from "../schema/config.js";
 
@@ -32,6 +33,7 @@ export interface EffectiveAgentScopeConfig {
       overrides: Record<string, RulePackOverride>;
     };
   };
+  gate: GateConfig;
 }
 
 /** Built-in policy/inference defaults (the V2.0 behavior, made explicit). */
@@ -69,6 +71,23 @@ export const BUILTIN_DEFAULTS: EffectiveAgentScopeConfig = {
     rule_packs: {
       disabled: [],
       overrides: {},
+    },
+  },
+  gate: {
+    enabled: true,
+    risk: {
+      max_score: 74,
+      max_level: "high",
+    },
+    decisions: {
+      max_denies: 0,
+      max_asks: 10,
+      allow_warnings: true,
+    },
+    rules: {
+      fail_on_blocked_path: true,
+      fail_on_dangerous_command: true,
+      fail_on_high_risk_without_review: false,
     },
   },
 };
@@ -154,5 +173,6 @@ export function normalizeConfig(
         overrides: config.inference.rule_packs?.overrides ?? {},
       },
     },
+    gate: structuredClone(config.gate),
   };
 }
