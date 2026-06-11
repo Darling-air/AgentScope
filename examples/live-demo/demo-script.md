@@ -79,7 +79,7 @@ agentscope install claude-code
 
 ---
 
-## Scene 5 — Evidence + Risk (0:42–0:58)
+## Scene 5 — Evidence + Risk (0:42–0:54)
 
 **On screen:** back in the terminal.
 
@@ -104,6 +104,30 @@ Top risk factors:
   [+10] Both blocked-path and high-risk activity occurred
 ```
 
+---
+
+## Scene 6 — Gate + CI summary (0:54–1:00)
+
+**Narration:**
+> "The same evidence drives a local policy gate and a CI summary."
+
+**Commands:**
+
+```bash
+agentscope gate
+agentscope ci-summary --output .agentscope/ci/summary.md
+```
+
+**Show:** the gate failing and the summary path:
+
+```text
+Policy gate: FAIL
+  - deny_count_exceeded: Deny count exceeded policy threshold
+  - blocked_path_denied: Blocked path access was denied
+
+[OK] Wrote .agentscope/ci/summary.md
+```
+
 **Closing line (text overlay):**
 > AgentScope — task-scoped runtime governance for AI coding agents. Local-first, no LLM judging.
 
@@ -114,4 +138,4 @@ Top risk factors:
 - Set `NO_COLOR=1` for clean, copy-pasteable terminal text, or keep colors for a livelier GIF.
 - Pre-create the demo repo and files off-camera so the recording focuses on the three decisions.
 - Keep each Claude Code prompt on screen long enough to read the decision.
-- The risk score (55/100, high) is deterministic for this exact scenario — it will reproduce.
+- The risk score (55/100, high) and the gate result (FAIL) are deterministic for this exact scenario — they will reproduce.

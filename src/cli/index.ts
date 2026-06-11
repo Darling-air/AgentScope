@@ -152,7 +152,7 @@ evidence
 // `agentscope report`
 program
   .command("report")
-  .description("Print an audit summary (counts, denied/asked actions, risk score) from the Evidence Package")
+  .description("Print a read-only audit summary (counts, denied/asked actions, risk score); never fails")
   .action(() => {
     reportCommand();
   });
@@ -160,9 +160,9 @@ program
 // `agentscope gate [--json] [--allow-missing-evidence]`
 program
   .command("gate")
-  .description("Evaluate the local policy gate from evidence, risk, and config")
+  .description("Enforce the local policy gate from evidence + risk + config (exit 0 pass/skipped, 1 fail)")
   .option("--json", "Output the full GateResultV1 as JSON")
-  .option("--allow-missing-evidence", "Skip the gate when evidence/latest.json is missing")
+  .option("--allow-missing-evidence", "Skip the gate (exit 0) when evidence/latest.json is missing")
   .action((options: GateCommandOptions) => {
     gateCommand(options);
   });
@@ -170,9 +170,9 @@ program
 // `agentscope ci-summary [--json] [--output <file>]`
 program
   .command("ci-summary")
-  .description("Generate a human-readable CI summary from evidence and risk")
+  .description("Write a human-readable CI summary from evidence + risk (display only; does not affect exit code)")
   .option("--json", "Print the summary JSON after writing Markdown")
-  .option("--output <file>", "Summary Markdown output path")
+  .option("--output <file>", "Summary Markdown output path (default .agentscope/ci/summary.md)")
   .action((options: CiSummaryCommandOptions) => {
     ciSummaryCommand(options);
   });
@@ -180,20 +180,20 @@ program
 // `agentscope ci init github-actions` / `agentscope ci doctor`
 const ci = program
   .command("ci")
-  .description("CI workflow helpers for AgentScope gate.");
+  .description("CI helpers: generate a gate workflow/action and diagnose CI readiness");
 
 const ciInit = ci
   .command("init")
-  .description("Initialize CI workflow templates for AgentScope gate");
+  .description("Generate CI workflow templates that run the AgentScope gate");
 
 ciInit
   .command("github-actions")
-  .description("Write .github/workflows/agentscope-gate.yml")
+  .description("Write .github/workflows/agentscope-gate.yml (a thin wrapper around `agentscope gate`)")
   .option("--force", "Overwrite an existing workflow")
   .option("--allow-missing-evidence", "Run gate with --allow-missing-evidence")
   .option("--package-manager <manager>", "Package manager: pnpm or npm", "pnpm")
-  .option("--mode <mode>", "Workflow mode: direct or action", "direct")
-  .option("--summary <file>", "Generate a CI summary at this path after the gate")
+  .option("--mode <mode>", "direct (run gate inline) or action (use the repo-local action.yml)", "direct")
+  .option("--summary <file>", "Also generate a CI summary at this path (display only)")
   .action((options: Parameters<typeof ciInitGithubActionsCommand>[0]) => {
     ciInitGithubActionsCommand(options);
   });
@@ -209,7 +209,7 @@ ci
 // `agentscope risk [--json]`
 program
   .command("risk")
-  .description("Compute a deterministic risk score from the Evidence Package")
+  .description("Compute a read-only deterministic risk score from the Evidence Package; never fails")
   .option("--json", "Print the full RiskScoreV1 JSON instead of a summary")
   .action((options: { json?: boolean }) => {
     riskCommand(options);

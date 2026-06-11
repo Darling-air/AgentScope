@@ -1,0 +1,113 @@
+{
+  "version": "0.1",
+  "status": "fail",
+  "passed": false,
+  "summary": "Policy gate failed.",
+  "task": {
+    "id": "fix-login-redirect-bug",
+    "title": "Fix login redirect bug"
+  },
+  "scope_hash": "sha256:be8af5fd67cb37b04c93ff0969d39a76b335b594719a64a482178ac0d5132165",
+  "risk": {
+    "version": "0.1",
+    "score": 55,
+    "level": "high",
+    "summary": "Risk 55/100 (high) from 3 event(s), 2 policy intervention(s).",
+    "task": {
+      "id": "fix-login-redirect-bug",
+      "title": "Fix login redirect bug"
+    },
+    "scope_hash": "sha256:be8af5fd67cb37b04c93ff0969d39a76b335b594719a64a482178ac0d5132165",
+    "counts": {
+      "total_events": 3,
+      "allow": 1,
+      "deny": 1,
+      "ask": 1,
+      "warn": 0,
+      "policy_interventions": 2
+    },
+    "factors": [
+      {
+        "id": "blocked_path_denied",
+        "label": "Blocked path access was denied",
+        "severity": "high",
+        "points": 20,
+        "event_id": "<session-id>:event-1",
+        "tool_name": "Read",
+        "action": "read",
+        "target": ".env.local",
+        "matched_rule": "blocked_paths:.env*"
+      },
+      {
+        "id": "high_risk_approval_required",
+        "label": "High-risk change required approval",
+        "severity": "high",
+        "points": 25,
+        "event_id": "<session-id>:event-2",
+        "tool_name": "Write",
+        "action": "write",
+        "target": "package.json",
+        "matched_rule": "high_risk:package.json"
+      },
+      {
+        "id": "mixed_blocked_and_high_risk",
+        "label": "Both blocked-path and high-risk activity occurred",
+        "severity": "high",
+        "points": 10
+      }
+    ],
+    "recommendations": [
+      "Review why the agent attempted to access blocked paths.",
+      "Manually review high-risk file changes before merging."
+    ],
+    "evidence": {
+      "path": "<project>/.agentscope/evidence/latest.json",
+      "created_at": "<timestamp>",
+      "updated_at": "<timestamp>"
+    }
+  },
+  "policy": {
+    "enabled": true,
+    "max_score": 74,
+    "max_level": "high",
+    "max_denies": 0,
+    "max_asks": 10,
+    "allow_warnings": true,
+    "fail_on_blocked_path": true,
+    "fail_on_dangerous_command": true,
+    "fail_on_high_risk_without_review": false
+  },
+  "reasons": [
+    {
+      "id": "deny_count_exceeded",
+      "label": "Deny count exceeded policy threshold",
+      "severity": "high",
+      "source": "decision",
+      "details": {
+        "deny": 1,
+        "max_denies": 0
+      }
+    },
+    {
+      "id": "blocked_path_denied",
+      "label": "Blocked path access was denied",
+      "severity": "high",
+      "source": "rule",
+      "details": {
+        "factors": [
+          {
+            "id": "blocked_path_denied",
+            "event_id": "<session-id>:event-1",
+            "target": ".env.local",
+            "matched_rule": "blocked_paths:.env*"
+          }
+        ]
+      }
+    }
+  ],
+  "evidence": {
+    "path": "<project>/.agentscope/evidence/latest.json",
+    "created_at": "<timestamp>",
+    "updated_at": "<timestamp>"
+  }
+}

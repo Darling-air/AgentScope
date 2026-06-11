@@ -14,7 +14,7 @@ AgentScope = Open Policy + Evidence Layer for AI Coding Agents
 
 AgentScope 是 AI Agent 时代的 IAM + CloudTrail + Policy Gate。
 
-> **当前实现状态（V1.5）：** 已落地 Task Scope Contract、Claude Code 运行时强制（PreToolUse hook：allow / deny / ask）、Evidence Package、确定性 Risk Score。本文档描述的是完整产品愿景；其中 **Policy Gate、GitHub Action、Scope Auto Inference 深化、Team Policy Registry、多 agent 治理仍是规划方向，尚未实现**。已实现范围以 [v0-v6-roadmap.md](v0-v6-roadmap.md) 的进度概览为准。
+> **当前实现状态（v0.1.0）：** 已落地 Task Scope Contract、Claude Code 运行时强制（PreToolUse hook：allow / deny / ask）、Evidence Package、确定性 Risk Score、Local Policy Gate（`agentscope gate`）、CI workflow template、repo-local GitHub Action、CI Summary（`agentscope ci-summary`）。本文档描述的是完整产品愿景；其中 **SARIF / PR comments、Marketplace Action publishing、Team Policy Registry、多 agent 治理、cloud sync 仍是规划方向，尚未实现**。已实现范围以 [v0-v6-roadmap.md](v0-v6-roadmap.md) 的进度概览为准。
 
 ## 2. 为什么需要 AgentScope
 

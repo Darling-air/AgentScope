@@ -100,6 +100,17 @@ The workflow writes:
 
 It also prints that JSON to the job log. Uploading it as an artifact is optional and not part of the core template.
 
+## CI Summary (optional)
+
+Generate a workflow that also writes a human-readable Markdown summary:
+
+```bash
+agentscope ci init github-actions --summary .agentscope/ci/summary.md
+agentscope ci init github-actions --mode action --summary .agentscope/ci/summary.md
+```
+
+The summary runs `agentscope ci-summary` after the gate. It is display only — it never changes the gate's exit code or fails the job. Suitable for a GitHub Actions Step Summary or an uploaded artifact.
+
 ## Current Limits
 
-V3.2 does not implement Marketplace publishing, SARIF, PR comments, JUnit output, GitHub API calls, branch protection integration, or remote/team policy.
+The following are **planned but not implemented**: Marketplace publishing, SARIF, PR comments, JUnit output, GitHub API calls, branch protection integration, and remote/team policy. Artifact upload of the gate result or CI summary is possible in your own workflow but is not required behavior of the core template.

@@ -2,9 +2,9 @@
 
 **Task-scoped runtime governance for AI coding agents.**
 
-AgentScope gives Claude Code a least-privilege task scope, enforces it at runtime, records evidence, and calculates a deterministic risk score.
+AgentScope gives Claude Code a least-privilege task scope, enforces it at runtime, records evidence, calculates a deterministic risk score, evaluates a local policy gate, and produces a human-readable CI summary.
 
-It turns a single natural-language coding task into an explicit, auditable **Task Scope Contract** �?which paths a session may touch, which are off-limits, which are high-risk, and which commands are allowed �?and then enforces that contract live, before each tool runs.
+It turns a single natural-language coding task into an explicit, auditable **Task Scope Contract** — which paths a session may touch, which are off-limits, which are high-risk, and which commands are allowed — and then enforces that contract live, before each tool runs.
 
 > Use tokens only to inform the agent. Use deterministic local code to govern the agent. No LLM judging, no network calls.
 
@@ -20,54 +20,38 @@ Scope:
   ask    on package.json
 
 Claude Code:
-  Read  .env.local          �?DENY
-  Write package.json        �?ASK
-  Edit  src/auth/login.ts   �?ALLOW
+  Read  .env.local          → DENY
+  Write package.json        → ASK
+  Edit  src/auth/login.ts   → ALLOW
 
 AgentScope:
   evidence/latest.json
   risk score: 55 / 100  (high)
+  gate:       FAIL
+  ci summary: .agentscope/ci/summary.md
 ```
 
-When Claude Code tries to read `.env.local`, AgentScope denies it. When it tries to modify `package.json`, AgentScope asks for confirmation. When it edits `src/auth/login.ts`, AgentScope allows it �?and every decision is recorded as evidence and rolled up into a deterministic risk score.
+When Claude Code tries to read `.env.local`, AgentScope denies it. When it tries to modify `package.json`, AgentScope asks for confirmation. When it edits `src/auth/login.ts`, AgentScope allows it — and every decision is recorded as evidence, rolled up into a deterministic risk score, evaluated by a local policy gate, and summarized for CI.
+
+## Why task-scoped governance
+
+An AI coding agent with broad tool access can read secrets, rewrite lockfiles, or run destructive commands — often as a side effect of a small, well-intentioned task. Reviewing the diff afterwards is too late, and asking an LLM to police itself is neither deterministic nor auditable.
+
+AgentScope scopes each task to least privilege *before* work starts, enforces that scope *live* on every tool call, and leaves a verifiable evidence trail. All of it runs locally with deterministic code — the same inputs always produce the same decisions, score, and gate result. No network, no LLM judging, no file-content inspection.
 
 ## Core capabilities
 
-- �?**Task Scope Contract** �?a least-privilege, per-task declaration of allowed / blocked / high-risk paths and commands
-- �?**Claude Code runtime enforcement** �?a PreToolUse hook returns `allow` / `ask` / `deny` before each `Read` / `Edit` / `Write` / `Bash`
-- �?**Evidence Package** �?every decision is appended to `.agentscope/evidence/latest.json` (governance metadata only)
-- �?**Deterministic Risk Score** �?an explainable 0�?00 score with per-factor breakdown and recommendations
-- �?**Local-first, no LLM judging** �?all inference, enforcement, evidence, and scoring run locally with no network access
-
-## Status
-
-V3.2 adds a repo-local reusable GitHub Action around the local Policy Gate CLI:
-
-- `agentscope risk` computes score only.
-- `agentscope report` prints an audit summary only and keeps exit code `0`.
-- `agentscope gate` enforces local gate policy from evidence + risk + config and exits `0` on pass/skipped, `1` on fail.
-- `agentscope ci init github-actions --mode direct` generates a GitHub Actions workflow that runs `agentscope gate`.
-- `agentscope ci init github-actions --mode action` generates a workflow that uses the repo-local `action.yml`.
-- `agentscope ci doctor` diagnoses whether this repo is ready to run the gate in CI, including `action.yml`.
-- The workflow and action are thin wrappers: they run `agentscope gate` and respect its exit code. They do not reimplement gate logic.
-- Marketplace Action publishing, SARIF, PR comments, and GitHub API calls are not implemented in V3.2.
-
-- �?Claude Code supported (live runtime enforcement)
-- �?Project-local config (`.agentscope/config.yaml`) for policy + inference tuning
-- �?Scope review & per-scope overrides (`scope explain` / `diff` / `apply`, `start` override flags)
-- �?Team Policy Registry �?**not implemented yet** (planned, V4)
-- Policy Gate CLI (`agentscope gate`) - implemented in V3.0
-- CI workflow template (`agentscope ci init` / `agentscope ci doctor`) - implemented in V3.1
-- Repo-local reusable GitHub Action - implemented in V3.2
-- Marketplace GitHub Action - **not implemented yet**
-- SARIF / CI report - **not implemented yet** (planned, V3.3)
-- SARIF / PR comments - **not implemented yet**
-
-`agentscope risk` and `agentscope report` are read-only summaries. They never fail CI, apply no threshold, and never change hook enforcement.
+- **Task Scope Contract** — a least-privilege, per-task declaration of allowed / blocked / high-risk paths and commands.
+- **Claude Code runtime enforcement** — a PreToolUse hook returns `allow` / `ask` / `deny` before each `Read` / `Edit` / `Write` / `Bash`.
+- **Evidence Package** — every decision is appended to `.agentscope/evidence/latest.json` (governance metadata only).
+- **Deterministic Risk Score** — an explainable 0–100 score with a per-factor breakdown and recommendations.
+- **Local Policy Gate** — `agentscope gate` evaluates evidence + risk + config and exits `0` on pass/skipped, `1` on fail.
+- **CI integration** — a GitHub Actions workflow template, a repo-local reusable Action, and a human-readable CI summary.
+- **Local-first, no LLM judging** — all inference, enforcement, evidence, scoring, and gating run locally with no network access.
 
 ## Quickstart
 
-Requires Node.js �?18 and [pnpm](https://pnpm.io/). Run from a project that is a **git repository**.
+Requires Node.js ≥ 18 and [pnpm](https://pnpm.io/). Run from a project that is a **git repository**.
 
 ```bash
 # 1. Build and link the CLI
@@ -87,9 +71,9 @@ claude
 In the live Claude Code session, try prompts that exercise each decision:
 
 ```text
-请使�?Read 工具读取 .env.local          �?AgentScope denies it
-请编�?package.json，加一个测试字�?      �?AgentScope asks for confirmation
-请编�?src/auth/login.ts，加一行注�?      �?AgentScope allows it
+Read .env.local           → AgentScope denies it
+Write package.json        → AgentScope asks for confirmation
+Edit src/auth/login.ts    → AgentScope allows it
 ```
 
 Then inspect what happened:
@@ -98,23 +82,25 @@ Then inspect what happened:
 agentscope evidence show   # summary of recorded policy decisions
 agentscope risk            # deterministic risk score + factors + recommendations
 agentscope report          # audit summary: counts, denied/asked actions, risk score
+agentscope gate            # local policy gate: exit 0 pass/skipped, 1 fail
+agentscope ci-summary      # human-readable Markdown summary (display only)
 ```
 
 > **Windows / PATH note:** if `agentscope` is not found after `pnpm link --global`, make sure the pnpm global bin directory is on your `PATH`. Run `pnpm bin --global` to find it, then add it to `PATH`. Alternatively, run the CLI directly with `node dist/index.js <command>` or `pnpm agentscope <command>`.
 
-A full, reproducible walkthrough lives in [`examples/live-demo/`](examples/live-demo/README.md).
+A full, reproducible walkthrough lives in [`examples/live-demo/`](examples/live-demo/README.md), and a copy-pasteable guide in [`docs/quickstart.md`](docs/quickstart.md).
 
-## What `agentscope start` infers (V0 scope inference)
+## What `agentscope start` infers
 
-Scope inference is intentionally simple and **deterministic** �?no LLM, no network:
+Scope inference is intentionally simple and **deterministic** — no LLM, no network:
 
-- Task title �?kebab-case task id
+- Task title → kebab-case task id
 - Keyword matching for likely paths:
-  - `login` / `redirect` / `session` / `auth` �?`src/auth/**`, `tests/auth/**`
-  - `component` / `ui` / `button` / `navbar` �?`src/components/**`, `tests/components/**`
-  - `ci` / `workflow` / `github` / `action` �?`.github/**` moved out of *blocked* into *allowed + high-risk*
-  - `migration` / `database` / `schema` �?`migrations/**` moved out of *blocked* into *allowed + high-risk*
-- No keyword match �?fall back to the config's default allowed paths
+  - `login` / `redirect` / `session` / `auth` → `src/auth/**`, `tests/auth/**`
+  - `component` / `ui` / `button` / `navbar` → `src/components/**`, `tests/components/**`
+  - `ci` / `workflow` / `github` / `action` → `.github/**` moved out of *blocked* into *allowed + high-risk*
+  - `migration` / `database` / `schema` → `migrations/**` moved out of *blocked* into *allowed + high-risk*
+- No keyword match → fall back to the config's default allowed paths
 - Confidence: `0.80` (multiple keyword hits), `0.72` (one), `0.55` (defaults only)
 
 Review or edit the active scope at any time:
@@ -124,24 +110,7 @@ agentscope show               # display the current Task Scope Contract
 agentscope check              # compare current git changes against the scope
 ```
 
-`agentscope check` classifies each changed file as OK / warning / violation and exits `1` only when a blocked path was modified �?useful as a complementary, after-the-fact diff check that needs no agent integration.
-
-## Dry-run Claude Code hook
-
-You can preview how the policy engine would respond to a Claude Code tool call without installing anything. The command reads a `PreToolUse` payload from stdin and prints a Claude Code hook response:
-
-```bash
-echo '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":".env.local"}}' \
-  | agentscope hook claude-code pre-tool-use
-```
-
-```json
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by AgentScope: .env.local matches blocked path .env*"}}
-```
-
-It reads the active `.agentscope/current-scope.yaml` and `config.yaml` from the current project. If there is no active scope, the payload is invalid, or anything else goes wrong, it returns a safe `ask` response (and still exits `0`) so a misconfigured hook never crashes the agent or silently allows an action.
-
-This is a **dry-run only**. To wire it into a live Claude Code session, install it (see below).
+`agentscope check` classifies each changed file as OK / warning / violation and exits `1` only when a blocked path was modified — useful as a complementary, after-the-fact diff check that needs no agent integration.
 
 ## Governing Claude Code
 
@@ -160,15 +129,30 @@ With the scope for "Fix login redirect bug" active and the hook installed, here 
 
 | Claude Code tool use | AgentScope decision | Why |
 | --- | --- | --- |
-| `Read` `.env.local` | �?**deny** | `.env*` is a blocked path |
-| `Edit` `package.json` | �?**ask** | high-risk path �?needs human confirmation |
-| `Edit` `src/auth/login.ts` | �?**allow** | within `src/auth/**` allowed paths |
+| `Read` `.env.local` | **deny** | `.env*` is a blocked path |
+| `Edit` `package.json` | **ask** | high-risk path — needs human confirmation |
+| `Edit` `src/auth/login.ts` | **allow** | within `src/auth/**` allowed paths |
 
-A `deny` blocks the tool use outright, and an `ask` pauses for the human to approve or reject �?so the agent stays inside the Task Scope Contract for the whole session. (`Bash` commands like `rm -rf node_modules` are also `deny`'d as dangerous commands.)
+A `deny` blocks the tool use outright, and an `ask` pauses for the human to approve or reject — so the agent stays inside the Task Scope Contract for the whole session. (`Bash` commands like `rm -rf node_modules` are also `deny`'d as dangerous commands.)
+
+### Dry-run hook preview
+
+You can preview how the policy engine would respond to a Claude Code tool call without installing anything. The command reads a `PreToolUse` payload from stdin and prints a Claude Code hook response:
+
+```bash
+echo '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":".env.local"}}' \
+  | agentscope hook claude-code pre-tool-use
+```
+
+```json
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by AgentScope: .env.local matches blocked path .env*"}}
+```
+
+It reads the active `.agentscope/current-scope.yaml` and `config.yaml` from the current project. If there is no active scope, the payload is invalid, or anything else goes wrong, it returns a safe `ask` response (and still exits `0`) so a misconfigured hook never crashes the agent or silently allows an action.
 
 ### Path normalization (Windows / POSIX)
 
-Claude Code may pass a `file_path` as either a relative path (`.env.local`) or an absolute one �?Windows (`G:\AgentScope\.env.local`) or POSIX (`G:/AgentScope/.env.local`). Scope globs are written repo-relative with forward slashes, so AgentScope normalizes every incoming target before matching: absolute paths under the project root are made **repo-relative**, backslashes become forward slashes, and Windows drive letters are compared case-insensitively. A path outside the project root is normalized but left absolute (never crashes, never wrongly collapses). This keeps enforcement consistent across Windows, macOS, and Linux.
+Claude Code may pass a `file_path` as either a relative path (`.env.local`) or an absolute one — Windows (`G:\AgentScope\.env.local`) or POSIX (`G:/AgentScope/.env.local`). Scope globs are written repo-relative with forward slashes, so AgentScope normalizes every incoming target before matching: absolute paths under the project root are made **repo-relative**, backslashes become forward slashes, and Windows drive letters are compared case-insensitively. A path outside the project root is normalized but left absolute (never crashes, never wrongly collapses). This keeps enforcement consistent across Windows, macOS, and Linux.
 
 ### Where it writes
 
@@ -182,7 +166,7 @@ The default is the **local** settings file so installing AgentScope does not cha
 ### Safety
 
 - **Backup**: before the first write, the existing settings file is copied to `<file>.agentscope-backup`. An existing backup is never overwritten, so it always holds your original pre-AgentScope settings.
-- **Non-destructive**: install preserves all other hooks and settings �?it only adds or refreshes the single AgentScope PreToolUse entry. Installing twice is idempotent (no duplicates).
+- **Non-destructive**: install preserves all other hooks and settings — it only adds or refreshes the single AgentScope PreToolUse entry. Installing twice is idempotent (no duplicates).
 - **Malformed settings**: if the settings file is not valid JSON, AgentScope refuses to overwrite it and reports an error.
 - **Dry run**: `agentscope install claude-code --dry-run` prints the target path and the resulting settings without writing anything or creating a backup.
 
@@ -193,19 +177,13 @@ agentscope uninstall claude-code            # removes the hook from settings.loc
 agentscope uninstall claude-code --shared   # removes it from settings.json
 ```
 
-Uninstall removes **only** the AgentScope hook, leaving your other hooks intact. It does not restore the backup file and does not delete the `.claude/` directory. If you want your exact original settings back, restore the `.agentscope-backup` file manually.
-
-### A note on the hook command
-
-The installed hook runs the bare command `agentscope hook claude-code pre-tool-use`, which requires the `agentscope` CLI to be on your `PATH`. Install it globally (`pnpm link --global` from this repo, or a published package once available) so Claude Code can invoke it. If `agentscope` is not on `PATH`, the hook will fail to run �?adjust the command in your settings to an absolute path or a `pnpm`-prefixed invocation if needed.
+Uninstall removes **only** the AgentScope hook, leaving your other hooks intact. It does not restore the backup file and does not delete the `.claude/` directory.
 
 ## Evidence
 
 Every live policy decision is recorded to a local audit artifact so there is a verifiable trail of what the agent asked to do and what AgentScope decided. After a decision is made, the hook appends an **EvidenceEvent** to `.agentscope/evidence/latest.json`.
 
-Recording is **best-effort**: if writing evidence fails for any reason, the hook still returns its normal `allow` / `ask` / `deny` response. Evidence never breaks enforcement, and the hook still emits only the response JSON on stdout. When there is no active scope (the safe-`ask` case), nothing is recorded because there is no task/scope snapshot to attach it to.
-
-The evidence records **governance metadata only** �?it never captures file contents, command output, or the agent's reply text.
+Recording is **best-effort**: if writing evidence fails for any reason, the hook still returns its normal `allow` / `ask` / `deny` response. Evidence never breaks enforcement. The evidence records **governance metadata only** — it never captures file contents, command output, or the agent's reply text.
 
 ```bash
 agentscope evidence show          # human-readable summary of recorded decisions
@@ -214,57 +192,25 @@ agentscope evidence clear         # delete latest.json (safe no-op if absent)
 agentscope report                 # audit summary: counts, denied + asked actions, risk score
 ```
 
-### What gets written
-
-`.agentscope/evidence/latest.json` is an **EvidencePackage**:
-
-```jsonc
-{
-  "version": "0.1",
-  "task": { "id": "...", "title": "...", "raw_input": "..." },
-  "scope": {
-    "scope_hash": "sha256:...",        // stable hash of the governing scope
-    "allowed_paths": [], "blocked_paths": [],
-    "allowed_commands": [], "high_risk": []
-  },
-  "events": [                          // every allow / deny / ask / warn
-    {
-      "id": "...", "timestamp": "...",
-      "agent": { "name": "claude-code", "session_id": "...", "transcript_path": "..." },
-      "tool_event": { /* ToolEvent: tool_name, action, target/command */ },
-      "policy_decision": { "decision": "deny", "reason": "...", "matched_rule": "..." }
-    }
-  ],
-  "policy_interventions": [],          // projection of non-allow events only
-  "created_at": "...", "updated_at": "..."
-}
-```
-
-The `scope_hash` is a `sha256` over a canonical snapshot of the scope (task id/title + the four path/command arrays). Object key order does not change it; array order is preserved, since scope ordering can be meaningful. On each decision the recorder:
-
-- creates a new package if `latest.json` does not exist,
-- **appends** the event when the current scope's `scope_hash` matches, or
-- **resets** the package (new `latest.json`) when the `scope_hash` differs �?so events are never mixed across scopes.
-
-Writes are atomic (temp file + rename) so an interrupted write never corrupts `latest.json`.
+The `scope_hash` is a `sha256` over a canonical snapshot of the scope (task id/title + the four path/command arrays). On each decision the recorder creates a new package if `latest.json` does not exist, **appends** the event when the current scope's `scope_hash` matches, or **resets** the package when the `scope_hash` differs — so events are never mixed across scopes. Writes are atomic (temp file + rename).
 
 ## Risk Score
 
-`agentscope risk` reads the Evidence Package and computes a **deterministic, explainable** risk score. It is a pure function of the evidence: same evidence in, same score out �?no LLM, no network, no clock, no file-content inspection. It never changes hook enforcement.
+`agentscope risk` reads the Evidence Package and computes a **deterministic, explainable** risk score. It is a pure function of the evidence: same evidence in, same score out — no LLM, no network, no clock, no file-content inspection. It never changes hook enforcement.
 
 ```bash
 agentscope risk          # human-readable score, factors, and recommendations
 agentscope risk --json   # the full RiskScoreV1 JSON
 ```
 
-The score is `0�?00`, mapped to a level:
+The score is `0–100`, mapped to a level:
 
 | Score | Level |
 | --- | --- |
-| 0�?4 | low |
-| 25�?9 | medium |
-| 50�?4 | high |
-| 75�?00 | critical |
+| 0–24 | low |
+| 25–49 | medium |
+| 50–74 | high |
+| 75–100 | critical |
 
 ### How the score is computed
 
@@ -272,21 +218,21 @@ Each event contributes points; every non-zero contribution becomes a **factor** 
 
 Per-event:
 
-- **deny** �?`max(risk_delta, 15)`; `dangerous_commands:*` rule �?at least 40; `blocked_paths:*` rule �?at least 20
-- **ask** �?`max(risk_delta, 8)`; `high_risk:*` rule �?at least 25; a write/edit with no matched rule �?at least 15
-- **warn** �?`max(risk_delta, 5)`
-- **allow** �?0, unless it carries a *positive* `risk_delta` (a negative `risk_delta` never pushes the total below 0)
+- **deny** → `max(risk_delta, 15)`; `dangerous_commands:*` rule → at least 40; `blocked_paths:*` rule → at least 20
+- **ask** → `max(risk_delta, 8)`; `high_risk:*` rule → at least 25; a write/edit with no matched rule → at least 15
+- **warn** → `max(risk_delta, 5)`
+- **allow** → 0, unless it carries a *positive* `risk_delta` (a negative `risk_delta` never pushes the total below 0)
 
 Session-level (added once if the condition holds):
 
-- �?3 policy interventions �?+10
-- �?2 denies �?+10
-- both a blocked-path and a high-risk intervention occurred �?+10
-- a dangerous command was attempted �?+15
+- ≥ 3 policy interventions → +10
+- ≥ 2 denies → +10
+- both a blocked-path and a high-risk intervention occurred → +10
+- a dangerous command was attempted → +15
 
-The total is clamped to `0�?00`. Recommendations are derived deterministically from which factors fired (e.g. a `blocked_path_denied` factor yields "Review why the agent attempted to access blocked paths."). When nothing risky fired, the recommendation is "No major policy concerns detected in this session."
+The total is clamped to `0–100`. Recommendations are derived deterministically from which factors fired.
 
-> **Not a policy gate.** `agentscope risk` computes score only. `agentscope report` prints an audit summary only and does not enforce thresholds.
+> **Not a policy gate.** `agentscope risk` computes score only. `agentscope report` prints an audit summary only. Neither enforces thresholds or changes the exit code. Use `agentscope gate` to enforce.
 
 ## Policy Gate
 
@@ -295,7 +241,9 @@ The total is clamped to `0�?00`. Recommendations are derived deterministically
 ```bash
 agentscope gate
 # Policy gate: FAIL
-# Reason: blocked path access was denied
+# Reasons:
+#   - deny_count_exceeded: Deny count exceeded policy threshold
+#   - blocked_path_denied: Blocked path access was denied
 
 agentscope gate --json
 agentscope gate --allow-missing-evidence
@@ -306,28 +254,21 @@ Exit codes:
 - `0` for pass or skipped
 - `1` for fail
 
-Missing evidence fails by default because the gate cannot prove the session was governed. Use `--allow-missing-evidence` to explicitly skip that case.
+Missing evidence fails by default because the gate cannot prove the session was governed. Use `--allow-missing-evidence` to explicitly skip that case during early rollout.
 
-## CI Workflow
+## CI
 
-`agentscope ci init github-actions` writes a GitHub Actions workflow that runs `agentscope gate` in CI:
-
-```bash
-agentscope ci init github-actions
-git add .github/workflows/agentscope-gate.yml
-```
-
-The default direct workflow runs `pnpm exec agentscope gate --json`. Gate exit code controls CI pass/fail. The workflow does not reimplement gate logic.
+AgentScope offers two GitHub Actions integration styles, both thin wrappers around `agentscope gate` — they never reimplement gate logic.
 
 ```bash
-agentscope ci init github-actions --mode direct
-agentscope ci init github-actions --mode action
+agentscope ci init github-actions                 # direct workflow (default)
+agentscope ci init github-actions --mode action   # uses the repo-local action.yml
 agentscope ci init github-actions --package-manager npm
 agentscope ci init github-actions --allow-missing-evidence
-agentscope ci init github-actions --force
+agentscope ci doctor                              # check CI readiness
 ```
 
-Repo-local action workflow mode uses:
+The direct workflow runs `pnpm exec agentscope gate --json` and exits with the gate's exit code, which controls CI pass/fail. The repo-local action exposes `status`, `score`, `level`, and `result-path` outputs:
 
 ```yaml
 - name: Run AgentScope Gate
@@ -336,20 +277,27 @@ Repo-local action workflow mode uses:
     package-manager: pnpm
 ```
 
-The action exposes `status`, `score`, `level`, and `result-path` outputs.
+### CI summary
 
-Check CI readiness with:
+`agentscope ci-summary` generates a human-readable Markdown summary from the evidence and risk score:
 
 ```bash
-agentscope ci doctor
-agentscope ci doctor --json
+agentscope ci-summary                              # writes .agentscope/ci/summary.md
+agentscope ci-summary --output path/to/summary.md  # custom path
+agentscope ci-summary --json                       # also print the summary JSON
 ```
 
-See [docs/ci.md](docs/ci.md) for the full guide. This is local-only and CI-only; V3.2 does not implement a Marketplace Action, SARIF, PR comments, or GitHub API calls.
+The summary includes the task, scope hash, risk score / level, denied / asked / high-risk actions, top risk factors, and recommendations. It is **display only**: it applies no threshold, never fails CI, and never changes the gate's exit code. Wire it into a workflow with `--summary`:
+
+```bash
+agentscope ci init github-actions --mode action --summary .agentscope/ci/summary.md
+```
+
+See [docs/ci.md](docs/ci.md) for the full guide. CI integration is local-only and CI-only.
 
 ## Configuration
 
-`agentscope init` writes `.agentscope/config.yaml`, a project-local file that tunes AgentScope's built-in policy defaults and inference preferences. Every list uses an `add` / `remove` structure so you adjust the defaults without restating them. All fields are optional �?missing fields fall back to built-in defaults.
+`agentscope init` writes `.agentscope/config.yaml`, a project-local file that tunes AgentScope's built-in policy defaults, inference preferences, and gate thresholds. Every list uses an `add` / `remove` structure so you adjust the defaults without restating them. All fields are optional — missing fields fall back to built-in defaults.
 
 ```yaml
 version: 1
@@ -368,22 +316,12 @@ policy:
       - gh secret *         # deny this command at runtime
 
 inference:
-  confidence_threshold: 0.65   # below this, the broad fallback is used
+  confidence_threshold: 0.65
   fallback:
     enabled: true
     allowed_paths:
       - src/**
       - tests/**
-      - __tests__/**
-  rule_packs:
-    disabled: []               # rule-pack ids to skip (e.g. ["frontend"])
-    overrides:
-      auth:
-        allowed_paths:
-          add:
-            - app/auth/**      # extend the auth pack's allowed paths
-          remove:
-            - src/**/login*
 
 gate:
   enabled: true
@@ -408,20 +346,14 @@ agentscope config show --json   # the effective config as JSON
 agentscope config validate      # exit 0 if valid (or no config), exit 1 if invalid
 ```
 
-How config is applied:
-
-- **Effective config** = built-in defaults �?legacy `defaults:` block (if any) �?your `policy.*` add/remove patches. `add` appends and de-duplicates (preserving order); `remove` strips exact matches only.
 - **Config changes affect newly generated scopes only.** Editing `config.yaml` does **not** rewrite your active `.agentscope/current-scope.yaml`. Re-run `agentscope start "<task>"` to apply config changes to a new scope.
-- **Runtime dangerous commands** for the Claude Code hook are read from `policy.dangerous_commands` in the effective config. An invalid config never crashes the hook and never weakens enforcement �?it falls back to the safe built-in dangerous-command list.
-- **Backward compatible:** an older config with a top-level `defaults:` block (including `defaults.dangerous_commands`) still works and is folded into the effective config.
+- **Runtime dangerous commands** for the Claude Code hook are read from `policy.dangerous_commands`. An invalid config never crashes the hook and never weakens enforcement — it falls back to the safe built-in dangerous-command list.
 
 ## Reviewing & overriding a scope
 
-Config is the project-wide layer that shapes *future* inference. **Overrides** are the per-scope layer that adjust *one* Task Scope Contract �?without ever touching `config.yaml`. Every override is recorded in the scope's rationale as an `Override: ...` line, so it stays visible.
+Config is the project-wide layer that shapes *future* inference. **Overrides** are the per-scope layer that adjust *one* Task Scope Contract — without ever touching `config.yaml`. Every override is recorded in the scope's rationale as an `Override: ...` line.
 
 ### Override at `start` time
-
-`agentscope start` accepts repeatable override flags. Inference runs first, then the overrides are applied, then the usual approve / dry-run / json flow:
 
 ```bash
 agentscope start "Fix login redirect bug" \
@@ -432,29 +364,25 @@ agentscope start "Fix login redirect bug" \
   --add-command "npm run test:auth"
 ```
 
-Flags (all repeatable): `--add-allowed` / `--remove-allowed`, `--add-blocked` / `--remove-blocked`, `--add-high-risk` / `--remove-high-risk`, `--add-command` / `--remove-command`. They compose with `--dry-run` (show the patched scope, write nothing) and `--json` (emit the patched scope plus the applied `overrides`).
+Flags (all repeatable): `--add-allowed` / `--remove-allowed`, `--add-blocked` / `--remove-blocked`, `--add-high-risk` / `--remove-high-risk`, `--add-command` / `--remove-command`. They compose with `--dry-run` and `--json`.
 
 ### The `scope` command group
 
 ```bash
-agentscope scope explain                       # explain the active scope (paths, commands, rationale)
+agentscope scope explain                       # explain the active scope
 agentscope scope explain --json                # the active scope as JSON
 
 agentscope scope list                                      # saved historical task scopes
 agentscope scope use fix-login-redirect-bug                # restore a historical scope
-agentscope scope diff --task fix-login-redirect-bug        # active scope vs a saved historical scope
-agentscope scope diff --task fix-login-redirect-bug --json # added/removed/unchanged as JSON
+agentscope scope diff --task fix-login-redirect-bug        # active scope vs a saved scope
+agentscope scope diff --task fix-login-redirect-bug --json
 
-agentscope scope apply --add-allowed "tests/app/auth/**"            # override the active scope (writes it)
+agentscope scope apply --add-allowed "tests/app/auth/**"            # override the active scope
 agentscope scope apply --add-allowed "tests/app/auth/**" --dry-run  # preview, write nothing
 agentscope scope apply --add-blocked "private/**" --json            # patched scope as JSON, no write
 ```
 
-- `scope explain` reads the active `current-scope.yaml` and prints paths, commands, and the full rationale (including `Inference:` and `Override:` lines).
-- `scope diff --task` re-runs inference for a task using the current config and compares it against the active scope �?useful to see what a fresh `start` would change. It writes nothing.
-- `scope apply` applies override flags to the active scope and rewrites `current-scope.yaml`. It does **not** re-run inference and does **not** modify `config.yaml`. An empty patch reports "no changes" and writes nothing; with no active scope it exits `1`.
-
-> Overrides change the active scope, and the Claude Code hook enforces whatever the active scope says. For example, removing `.env*` from `blocked_paths` via an override means a later `Read .env.local` is no longer denied �?that is an explicit, user-requested change, and it shows up in the rationale.
+`scope apply` rewrites `current-scope.yaml` from override flags. It does **not** re-run inference and does **not** modify `config.yaml`.
 
 ## Files AgentScope writes
 
@@ -466,25 +394,41 @@ agentscope scope apply --add-blocked "private/**" --json            # patched sc
     <task-id>.yaml       # a per-task snapshot of each approved scope
   evidence/
     latest.json          # Evidence Package (live policy decisions)
+  ci/
+    summary.md           # CI summary (written by `ci-summary`)
+    gate-result.json     # gate result JSON (written by the CI workflow)
 ```
 
-The risk score is computed on demand from `latest.json`; it is not persisted. AgentScope never reads the *contents* of your source or secret files �?it only matches file **paths** against glob patterns, and evidence stores only governance metadata.
+The risk score is computed on demand from `latest.json`; it is not persisted. AgentScope never reads the *contents* of your source or secret files — it only matches file **paths** against glob patterns, and evidence stores only governance metadata.
 
-## Not supported yet
+## Status and limitations
 
-These are planned for later milestones and are **not implemented yet**:
+AgentScope is at **v0.1.0**. The local + CI loop is complete:
 
-- �?Claude Code PreToolUse hook + installer with live runtime enforcement �?*done in V1.0–V1.2*
-- �?Evidence Event Recorder (`evidence show` / `clear`, `report`) �?*done in V1.3*
-- �?Risk Score V1 (`agentscope risk`) �?*done in V1.4*
-- �?Project-local policy config (`.agentscope/config.yaml`, `config show` / `validate`) �?*done in V2.1*
-- �?Team Policy Registry & templates (shared/remote policy) �?*not yet, V4*
-- �?GitHub Action / Policy Gate in CI (threshold, exit codes) �?*not yet, V3*
-- �?Evidence hashes (diff/transcript), signed evidence �?*not yet, V3*
-- Multi-agent governance (Cursor / Codex / Gemini), MCP-specific handling �?*V5*
-- Web UI / dashboard, cloud services, LLM-based inference �?later / out of scope
+```text
+Local:  task → scope → enforcement → evidence → risk → gate
+CI:     workflow template → reusable action → gate-result.json → summary.md
+```
 
-Note: `agentscope check` still inspects the resulting `git` diff after the fact. The Claude Code hook adds *live* enforcement during a session, but the two are complementary �?the diff check does not require any agent integration.
+Implemented and supported:
+
+- Task Scope Contract, deterministic scope inference, project-local config, per-scope overrides, and multi-task scope history
+- Claude Code live runtime enforcement (PreToolUse hook + installer)
+- Evidence Package, deterministic Risk Score, and audit report
+- Local Policy Gate (`agentscope gate`)
+- CI workflow template, repo-local reusable GitHub Action, and CI summary output
+
+**Not implemented yet** (planned for later milestones — see [docs/v0-v6-roadmap.md](docs/v0-v6-roadmap.md)):
+
+- SARIF output
+- PR comments
+- Marketplace Action publishing
+- GitHub API integration
+- Remote / team policy registry and cloud sync
+- Multi-agent governance (Cursor / Codex / Gemini), MCP-specific handling
+- Web UI / dashboard, LLM-based inference
+
+This release does **not** call any network or GitHub API, does **not** inspect file contents, and does **not** capture command output.
 
 ## Development
 
@@ -494,37 +438,44 @@ pnpm build        # build the CLI to dist/
 pnpm test         # run the Vitest suite
 pnpm lint         # run ESLint
 pnpm typecheck    # run tsc --noEmit
+pnpm smoke        # end-to-end CLI smoke test in a temp dir (build first)
 ```
 
-### Project layout
+See [docs/release-checklist.md](docs/release-checklist.md) before cutting a release, and [CHANGELOG.md](CHANGELOG.md) for the release notes.
 
-Core logic is kept separate from the CLI so that it stays agent-agnostic and reusable by future adapters:
+### Project layout
 
 ```
 src/
   core/                  # deterministic, testable, no CLI/agent dependencies
     schema/              # Zod schemas (ScopeContract, config)
     scope/               # task-id, scope read/write, create-scope, override + diff
-    scope-inference/     # V2.0 deterministic classifier + rule packs + engine
+    scope-inference/     # deterministic classifier + rule packs + engine
     config/              # config schema, effective-config merge, loader
     git/                 # changed-files via git
     check/               # scope check logic
     policy/              # centralized path matching (picomatch)
     evidence/            # Evidence Package: schema, scope-hash, store, recorder
     risk/                # Risk Score: schema, engine, recommendations
+    gate/                # Policy Gate: schema, engine
+    ci/                  # CI workflow template, action, ci-summary
     fs/                  # project path resolution
   cli/                   # Commander entrypoint + command orchestration
-    commands/            # init, start, show, check, install, evidence, report, risk, config, scope
+    commands/            # init, start, show, check, install, evidence, report, risk, gate, ci, ci-summary, config, scope
 
 docs/
+  quickstart.md
+  ci.md
+  architecture.md
   product-vision.md
   v0-v6-roadmap.md
-  architecture.md
+  release-checklist.md
 
 examples/
-  live-demo/             # reproducible deny / ask / allow walkthrough
+  live-demo/             # reproducible deny / ask / allow walkthrough with reference outputs
+  github-actions/        # copyable workflow + action examples
 ```
 
 ## License
 
-MIT �?see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

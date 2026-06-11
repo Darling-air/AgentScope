@@ -1,6 +1,6 @@
 # AgentScope CI
 
-V3.2 supports two GitHub Actions integration styles: a direct workflow template and a repo-local reusable action. Both are thin wrappers around `agentscope gate`; neither is a Marketplace Action.
+AgentScope supports two GitHub Actions integration styles: a direct workflow template and a repo-local reusable action. Both are thin wrappers around `agentscope gate`; neither is a Marketplace Action. An optional CI summary step produces a human-readable Markdown report.
 
 ## How CI Gate Works
 
@@ -34,6 +34,7 @@ agentscope ci init github-actions --mode action
 agentscope ci init github-actions --package-manager pnpm
 agentscope ci init github-actions --package-manager npm
 agentscope ci init github-actions --allow-missing-evidence
+agentscope ci init github-actions --summary .agentscope/ci/summary.md
 ```
 
 The command writes `.github/workflows/agentscope-gate.yml`. It does not run `git add`, commit changes, call GitHub APIs, or modify `.agentscope/config.yaml`.
@@ -144,7 +145,7 @@ Action outputs:
 
 The action creates `.agentscope/ci`, runs `agentscope gate --json`, writes `.agentscope/ci/gate-result.json`, parses outputs from that JSON, and finally exits with the gate command's exit code. It does not copy threshold, factor, policy, risk, evidence, hook, or scope-history logic.
 
-Future Marketplace Action usage is planned but not implemented yet.
+Marketplace Action usage is planned but not implemented yet.
 
 ## Missing Evidence
 
@@ -168,6 +169,27 @@ The workflow writes:
 
 The file contains the `GateResultV1` JSON produced by `agentscope gate --json`. The template also prints it to the job log.
 
+## CI Summary
+
+`agentscope ci-summary` writes a human-readable Markdown summary from the Evidence Package and risk score:
+
+```bash
+agentscope ci-summary                              # writes .agentscope/ci/summary.md
+agentscope ci-summary --output path/to/summary.md  # custom path
+agentscope ci-summary --json                       # also print the summary JSON
+```
+
+The summary includes the task, scope hash, risk score / level, denied / asked / high-risk actions, top risk factors, and recommendations. It is **display only**: it applies no threshold, never fails CI, and never changes the gate's exit code.
+
+Add a summary step to a generated workflow with `--summary`:
+
+```bash
+agentscope ci init github-actions --summary .agentscope/ci/summary.md
+agentscope ci init github-actions --mode action --summary .agentscope/ci/summary.md
+```
+
+In `--mode action`, this passes a `summary-path` input to the repo-local action; the action runs `agentscope ci-summary` after the gate and tolerates its failure so the summary step never changes the job result. The summary file is suitable for a GitHub Actions Step Summary or an uploaded artifact (artifact upload is optional and not part of the core template).
+
 ## Doctor
 
 Run:
@@ -189,11 +211,11 @@ Missing diagnostic items do not cause exit `1`; doctor is not a gate. If a workf
 
 ## Current Limits
 
-V3.2 does not implement:
+The following are **planned but not implemented**:
 
-- Marketplace Action
-- SARIF
-- PR comment
+- Marketplace Action publishing
+- SARIF output
+- PR comments
 - JUnit output
 - GitHub API calls
 - remote/team policy registry
@@ -202,3 +224,5 @@ V3.2 does not implement:
 - branch protection integration
 - file content inspection
 - command output capture
+
+Artifact upload of the gate result or CI summary is possible in your own workflow but is not required behavior of the core template.

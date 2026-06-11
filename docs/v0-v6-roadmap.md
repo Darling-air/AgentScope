@@ -8,11 +8,12 @@ V2.3  done     Multi-task Scope History
 V3.0  done     Local Policy Gate CLI (`agentscope gate`)
 V3.1  done     CI workflow template
 V3.2  done     Repo-local reusable GitHub Action
-V3.3  planned  SARIF / PR comments / CI report
-V4    planned  Team Policy Registry
+V3.3  done     CI Summary Output (`agentscope ci-summary`)
+V3.4  done     Release hardening / demo polish (v0.1.0)
+V4    planned  SARIF / PR comments / Team Policy Registry
 ```
 
-V3.2 is local-only and CI-only. It implements a repo-local reusable GitHub Action, but does not implement Marketplace Action publishing, SARIF, PR comments, GitHub API calls, remote/team policy, cloud sync, or branch protection integration.
+The local + CI loop is complete and local-only / CI-only. It implements a repo-local reusable GitHub Action and a human-readable CI summary, but does **not** implement Marketplace Action publishing, SARIF, PR comments, GitHub API calls, remote/team policy, cloud sync, or branch protection integration. Those remain planned.
 
 ## 鎬讳綋璺嚎
 
@@ -651,14 +652,15 @@ evidence_hash:
   ]
 }
 
-### V3.2 Current Boundary
+### V3 Current Boundary
 
 V3 is split into narrow CI phases:
 
 - V3.0: local `agentscope gate`
 - V3.1: direct GitHub Actions workflow template
 - V3.2: repo-local reusable `action.yml`
-- V3.3: planned SARIF / PR comments / CI report polish
+- V3.3: CI summary output (`agentscope ci-summary`)
+- V3.4: release hardening / demo polish (v0.1.0)
 
 Current repo-local action usage:
 
@@ -671,7 +673,7 @@ Current repo-local action usage:
 
 The action is a thin wrapper. It runs `agentscope gate --json`, writes `.agentscope/ci/gate-result.json`, exposes `status`, `score`, `level`, and `result-path`, then exits with the gate command's exit code.
 
-V3.2 does not implement Marketplace Action publishing, SARIF, PR comments, GitHub API calls, file content inspection, or command output capture.
+The CI integration does not implement Marketplace Action publishing, SARIF, PR comments, GitHub API calls, file content inspection, or command output capture. Those remain planned.
 
 ### Policy Gate Rules
 
