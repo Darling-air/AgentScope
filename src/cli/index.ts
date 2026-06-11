@@ -14,6 +14,10 @@ import { reportCommand } from "./commands/report.js";
 import { riskCommand } from "./commands/risk.js";
 import { gateCommand, type GateCommandOptions } from "./commands/gate.js";
 import {
+  ciDoctorCommand,
+  ciInitGithubActionsCommand,
+} from "./commands/ci.js";
+import {
   configShowCommand,
   configValidateCommand,
 } from "./commands/config.js";
@@ -157,6 +161,33 @@ program
   .option("--allow-missing-evidence", "Skip the gate when evidence/latest.json is missing")
   .action((options: GateCommandOptions) => {
     gateCommand(options);
+  });
+
+// `agentscope ci init github-actions` / `agentscope ci doctor`
+const ci = program
+  .command("ci")
+  .description("CI workflow helpers for AgentScope gate.");
+
+const ciInit = ci
+  .command("init")
+  .description("Initialize CI workflow templates for AgentScope gate");
+
+ciInit
+  .command("github-actions")
+  .description("Write .github/workflows/agentscope-gate.yml")
+  .option("--force", "Overwrite an existing workflow")
+  .option("--allow-missing-evidence", "Run gate with --allow-missing-evidence")
+  .option("--package-manager <manager>", "Package manager: pnpm or npm", "pnpm")
+  .action((options: Parameters<typeof ciInitGithubActionsCommand>[0]) => {
+    ciInitGithubActionsCommand(options);
+  });
+
+ci
+  .command("doctor")
+  .description("Diagnose whether this repo is ready to run AgentScope gate in CI")
+  .option("--json", "Output diagnostics as JSON")
+  .action((options: Parameters<typeof ciDoctorCommand>[0]) => {
+    ciDoctorCommand(options);
   });
 
 // `agentscope risk [--json]`

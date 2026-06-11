@@ -1,0 +1,51 @@
+import { describe, it, expect } from "vitest";
+import { githubActionsWorkflowTemplate } from "./github-actions-template.js";
+
+describe("githubActionsWorkflowTemplate", () => {
+  it("generated pnpm workflow contains pnpm install", () => {
+    const workflow = githubActionsWorkflowTemplate({ packageManager: "pnpm" });
+    expect(workflow).toContain("corepack enable");
+    expect(workflow).toContain("pnpm install --frozen-lockfile");
+  });
+
+  it("generated pnpm workflow uses pnpm exec agentscope gate --json", () => {
+    const workflow = githubActionsWorkflowTemplate({ packageManager: "pnpm" });
+    expect(workflow).toContain("pnpm exec agentscope gate --json > .agentscope/ci/gate-result.json");
+  });
+
+  it("generated npm workflow contains npm ci", () => {
+    const workflow = githubActionsWorkflowTemplate({ packageManager: "npm" });
+    expect(workflow).toContain("npm ci");
+    expect(workflow).not.toContain("pnpm install");
+  });
+
+  it("generated npm workflow uses npx agentscope gate --json", () => {
+    const workflow = githubActionsWorkflowTemplate({ packageManager: "npm" });
+    expect(workflow).toContain("npx agentscope gate --json > .agentscope/ci/gate-result.json");
+  });
+
+  it("allow-missing-evidence adds --allow-missing-evidence", () => {
+    const workflow = githubActionsWorkflowTemplate({
+      packageManager: "pnpm",
+      allowMissingEvidence: true,
+    });
+    expect(workflow).toContain(
+      "pnpm exec agentscope gate --json --allow-missing-evidence > .agentscope/ci/gate-result.json",
+    );
+  });
+
+  it("workflow writes .agentscope/ci/gate-result.json", () => {
+    const workflow = githubActionsWorkflowTemplate();
+    expect(workflow).toContain("mkdir -p .agentscope/ci");
+    expect(workflow).toContain("> .agentscope/ci/gate-result.json");
+    expect(workflow).toContain("cat .agentscope/ci/gate-result.json");
+  });
+
+  it("workflow does not duplicate gate logic", () => {
+    const workflow = githubActionsWorkflowTemplate();
+    expect(workflow).not.toContain("max_score");
+    expect(workflow).not.toContain("max_denies");
+    expect(workflow).not.toContain("blocked_path_denied");
+    expect(workflow).not.toContain("risk_score_exceeded");
+  });
+});

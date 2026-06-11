@@ -21,4 +21,5 @@ export * from "./fs/project-paths.js";
 export * from "./evidence/index.js";
 export * from "./risk/index.js";
 export * from "./gate/index.js";
+export * from "./ci/index.js";
 export * from "./adapters/claude-code/index.js";
