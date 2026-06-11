@@ -7,3 +7,10 @@ dist/
 .agentscope/current-scope.yaml
 .agentscope/scopes/
 .agentscope/evidence/
+
+# Local AgentScope / Claude runtime state
+.agentscope/
+.claude/
+.env
+.env.*
+!.env.example
