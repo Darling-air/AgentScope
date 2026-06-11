@@ -1,406 +1,501 @@
 # AgentScope 开发上下文
 
-当前阶段：**V1.4 Risk Score V1**
+当前阶段：**V3.4 Release Hardening / Demo Polish**
 
-AgentScope 的产品定位是：
+AgentScope 的产品定位：
 
-> AI Coding Session 的 Task-Scoped Governance Layer
-> 用 Task Scope Contract 对 AI coding agent 的工具调用进行最小权限治理、运行时拦截、审计证据记录和风险评估。
+> Task-scoped runtime governance for AI coding agents.
+> AgentScope turns an AI coding task into a least-privilege scope, enforces it at runtime, records evidence, computes deterministic risk, and gates the result locally or in CI.
 
 AgentScope 不是 repo context packer，不是 CLAUDE.md 生成器，不是 MCP scanner，也不是 AI PR reviewer。
 
-核心闭环是：
+核心闭环：
 
 ```txt
 Task
 → Scope Auto Inference
-→ Human Approval
+→ Human Approval / Override
 → Runtime Enforcement
 → Evidence Package
 → Risk Scoring
 → Policy Gate
+→ CI Enforcement
+→ CI Summary Output
 ```
 
 当前已经完成：
 
 ```txt
-V0   本地 Task Scope Contract 原型
-V1.0 Core Policy Engine
-V1.1 Claude Code Hook Translator + Dry-run Entrypoint
-V1.2 Claude Code Hook Installer + Live Runtime Enforcement
-V1.3 Evidence Event Recorder
+V0   ✅ Local Task Scope Contract prototype
+V1.0 ✅ Core Policy Engine
+V1.1 ✅ Claude Code Hook Translator + Hook Entrypoint
+V1.2 ✅ Claude Code Hook Installer + Live Runtime Enforcement
+V1.3 ✅ Evidence Event Recorder
+V1.4 ✅ Deterministic Risk Score V1
+V1.5 ✅ GitHub-ready Demo Polish
+V2.0 ✅ Scope Inference V2
+V2.1 ✅ Project-local Policy Config
+V2.2 ✅ Scope Review / Override UX
+V2.3 ✅ Multi-task Scope History
+V3.0 ✅ Policy Gate CLI
+V3.1 ✅ CI Workflow Template
+V3.2 ✅ Reusable GitHub Action
+V3.3 ✅ CI Summary Output
 ```
 
-V1.3 已验证：
+当前真实能力：
 
 ```txt
-✅ .agentscope/evidence/latest.json 会被创建
-✅ EvidencePackageV1 会记录 task、scope、scope_hash
-✅ EvidenceEvent 会记录 ToolEvent + PolicyDecision
-✅ policy_interventions 只记录 deny / ask / warn
-✅ session_id / transcript_path 会被捕获
-✅ Read .env.local → deny evidence event
-✅ Write package.json → ask evidence event
-✅ Write src/auth/login.ts → allow evidence event
-✅ agentscope evidence show 可用
-✅ agentscope evidence clear 可用
-✅ agentscope report 可用
-✅ evidence 不记录文件内容、命令输出、Claude 回复正文
-✅ pnpm build / typecheck / lint / test 已通过
+✅ agentscope init
+✅ agentscope config show / show --json / validate
+✅ agentscope start "<task>"
+✅ agentscope start "<task>" --dry-run / --json
+✅ agentscope show
+✅ agentscope check
+✅ agentscope scope explain / diff / apply / list / use
+✅ agentscope hook claude-code pre-tool-use
+✅ agentscope install claude-code
+✅ agentscope uninstall claude-code
+✅ agentscope evidence show / clear
+✅ agentscope risk / risk --json
+✅ agentscope report
+✅ agentscope gate / gate --json / gate --allow-missing-evidence
+✅ agentscope ci init github-actions
+✅ agentscope ci doctor
+✅ agentscope ci-summary / ci-summary --json / ci-summary --output
+✅ repo-local GitHub Action via action.yml
 ```
 
-不要回退 V1.0-V1.3。不要重写 PolicyEngine、Claude Code installer、path normalization 或 Evidence schema，除非 V1.4 需要最小兼容改动。
+不要回退 V1.0-V3.3。
+不要重写 PolicyEngine、Claude Code adapter、Evidence schema、Risk engine、Scope Inference V2、Effective Config、Scope Override、Scope History、Gate Engine、CI template、Action wrapper 或 CI Summary。
+
+V3.4 只聚焦 **release hardening、demo polish、documentation、packaging readiness、smoke testing**。
+
+不要实现新治理能力。
+不要实现 SARIF。
+不要实现 PR comment。
+不要实现 Marketplace 发布。
+不要实现 remote/team policy。
+不要实现云端功能。
 
 ---
 
-# V1.4 目标
+# V3.4 目标
 
-V1.4 只做一件事：
+V3.4 只做一件事：
 
-> 基于 `.agentscope/evidence/latest.json` 计算 deterministic risk score，并通过 CLI 展示。
+> 把 AgentScope 打磨到可以公开发布、展示、录屏、拿 GitHub star 的 v0.1.0 release candidate 状态。
 
-V1.4 的核心输入是 V1.3 Evidence Package。
-V1.4 的输出是 Risk Score Report。
-
----
-
-# V1.4 关键原则
+这一阶段不是功能扩张，而是：
 
 ```txt
-Evidence first, score second.
-Risk scoring reads evidence.
-Risk scoring does not decide runtime permissions.
-Risk scoring does not block commands.
-Risk scoring does not fail CI.
-```
-
-V1.4 不改变 Claude Code hook 的 allow / deny / ask 行为。
-V1.4 不改变 PolicyEngine 语义。
-V1.4 不实现 Policy Gate。
-
-Policy Gate 是后续版本。
-V1.4 只是可解释、确定性的风险评分。
-
----
-
-# V1.4 应实现的能力
-
-## 1. Risk Score 数据结构
-
-新增 RiskScoreV1：
-
-```ts
-type RiskLevel = "low" | "medium" | "high" | "critical"
-
-type RiskFactor = {
-  id: string
-  label: string
-  severity: "info" | "low" | "medium" | "high" | "critical"
-  points: number
-  event_id?: string
-  tool_name?: string
-  action?: string
-  target?: string
-  matched_rule?: string
-}
-
-type RiskScoreV1 = {
-  version: "0.1"
-  score: number
-  level: RiskLevel
-  summary: string
-  task: {
-    id: string
-    title: string
-  }
-  scope_hash: string
-  counts: {
-    total_events: number
-    allow: number
-    deny: number
-    ask: number
-    warn: number
-    policy_interventions: number
-  }
-  factors: RiskFactor[]
-  recommendations: string[]
-  evidence: {
-    path?: string
-    created_at: string
-    updated_at: string
-  }
-}
-```
-
-Score 范围：
-
-```txt
-0-100
-```
-
-Risk level：
-
-```txt
-0-24    low
-25-49   medium
-50-74   high
-75-100  critical
+make the project easy to understand
+make the demo easy to reproduce
+make the package safe to publish
+make the CLI help consistent
+make the docs trustworthy
 ```
 
 ---
 
-## 2. Deterministic Risk Engine
+# V3.4 核心原则
 
-实现纯函数：
+```txt
+No new governance model.
+No behavior-changing rewrite.
+No schema churn unless strictly necessary.
+No breaking CLI changes.
+No speculative enterprise/cloud features.
+Release polish over feature growth.
+```
 
-```ts
-calculateRiskScore(evidence: EvidencePackageV1, options?: { evidencePath?: string }): RiskScoreV1
+允许做：
+
+```txt
+✅ README polish
+✅ docs polish
+✅ examples polish
+✅ package metadata polish
+✅ CLI help polish
+✅ release checklist
+✅ changelog
+✅ smoke test script
+✅ demo fixture cleanup
+✅ action/workflow docs cleanup
+```
+
+不允许做：
+
+```txt
+❌ new runtime policy semantics
+❌ new risk scoring rules
+❌ new evidence schema
+❌ new gate rules
+❌ SARIF
+❌ PR comment
+❌ Marketplace release
+❌ npm publish
+❌ cloud/team registry
+❌ file content inspection
+❌ command output capture
+```
+
+---
+
+# V3.4 应实现的能力
+
+## 1. README Hero Demo 更新到 V3.3 能力
+
+README 首页应清楚展示完整价值链：
+
+```txt
+Task: Fix login redirect bug
+
+Scope:
+  allow src/auth/**
+  block .env*
+  ask on package.json
+
+Claude Code:
+  Read .env.local          → DENY
+  Write package.json       → ASK
+  Edit src/auth/login.ts   → ALLOW
+
+AgentScope:
+  evidence/latest.json
+  risk score: 55 / 100
+  gate: FAIL
+  ci summary: .agentscope/ci/summary.md
+```
+
+README 顶部应突出：
+
+```txt
+Task-scoped runtime governance for AI coding agents.
+```
+
+README 应快速说明：
+
+```txt
+1. What AgentScope is
+2. Why task-scoped governance matters
+3. Quickstart
+4. Claude Code integration
+5. Evidence / Risk / Gate
+6. CI / GitHub Actions
+7. Local-first / deterministic / no LLM judging
+8. Current status and limitations
+```
+
+避免过度营销，不要写尚未实现的能力。
+
+---
+
+## 2. Quickstart 独立文档
+
+新增或整理：
+
+```txt
+docs/quickstart.md
+```
+
+内容应可复制执行，覆盖：
+
+```bash
+pnpm install
+pnpm build
+pnpm link --global
+
+agentscope init
+agentscope start "Fix login redirect bug"
+agentscope install claude-code
+claude
+
+agentscope evidence show
+agentscope risk
+agentscope gate
+agentscope ci-summary
+```
+
+Windows 注意事项：
+
+```txt
+pnpm global bin / PATH
+```
+
+缺 evidence、gate fail、allow-missing-evidence 的区别要解释清楚。
+
+---
+
+## 3. Demo 文档和示例整理
+
+更新或新增：
+
+```txt
+examples/live-demo/README.md
+examples/live-demo/demo-script.md
+examples/live-demo/expected-evidence.json
+examples/live-demo/expected-risk-report.txt
+examples/live-demo/expected-gate-result.json
+examples/live-demo/expected-ci-summary.md
 ```
 
 要求：
 
 ```txt
-同一个 evidence 输入必须得到同一个 risk output。
-不得调用 LLM。
-不得访问网络。
-不得读取文件内容。
-不得依赖当前时间。
+- 不包含真实 secret。
+- 不包含用户本地路径。
+- session_id / transcript_path / timestamp 使用 placeholder。
+- risk score / gate result / summary 与当前规则一致。
+- demo 能体现 deny / ask / allow 三类结果。
 ```
 
-Risk score 可以基于以下信号：
+Demo script 应适合录屏：
 
 ```txt
-deny events
-ask events
-warn events
-policy_decision.risk_delta
-matched_rule
-tool_event.action
-tool_event.target
-tool_event.tool_name
-是否命中 blocked_paths
-是否命中 high_risk
-是否涉及 dangerous command
-policy_interventions 数量
+1. init
+2. start task
+3. install claude-code
+4. trigger .env.local deny
+5. trigger package.json ask
+6. trigger src/auth/login.ts allow
+7. show evidence
+8. show risk
+9. show gate
+10. show ci summary
 ```
-
-推荐 V1 scoring 规则：
-
-```txt
-每个 deny：
-  使用 max(policy_decision.risk_delta, 15)
-  如果 matched_rule 以 dangerous_commands 开头，至少 40 分
-  如果 matched_rule 以 blocked_paths 开头，至少 20 分
-
-每个 ask：
-  使用 max(policy_decision.risk_delta, 8)
-  如果 matched_rule 以 high_risk 开头，至少 25 分
-  如果 action 是 write/edit 且没有 matched_rule，至少 15 分
-
-每个 warn：
-  使用 max(policy_decision.risk_delta, 5)
-
-每个 allow：
-  默认 0 分
-  如果 policy_decision.risk_delta 为正，可以计入该正分
-  如果 risk_delta 为负，不要让总分低于 0
-```
-
-Session-level factors：
-
-```txt
-policy_interventions >= 3 → +10
-deny >= 2 → +10
-同时存在 blocked_paths 和 high_risk intervention → +10
-dangerous command 出现过 → +15
-```
-
-总分最后 clamp 到：
-
-```txt
-0 <= score <= 100
-```
-
-这只是 V1 规则，必须保持简单、可解释、可测试。
 
 ---
 
-## 3. Risk Factors
+## 4. Package metadata / npm readiness 检查
 
-每个非零分来源都应该产生 RiskFactor。
+检查并修正：
 
-示例：
+```txt
+package.json:
+  name
+  version
+  description
+  type
+  bin
+  files
+  keywords
+  license
+  repository
+  homepage
+  bugs
+  engines
+  scripts
+```
+
+要求：
+
+```txt
+- version 保持 0.1.0，除非项目已有不同计划。
+- bin 指向 dist/index.js。
+- files 只包含发布需要的内容。
+- 不包含本地测试产物、临时文件、.agentscope/evidence 实例、真实 secrets。
+- package metadata 应适合 npm publish，但 V3.4 不执行 npm publish。
+```
+
+建议增加或检查：
+
+```txt
+.npmignore 或 package.json files
+```
+
+如果已有 `files` 字段，优先使用 `files` 字段控制发布内容。
+
+---
+
+## 5. CLI help 全面 polish
+
+检查所有命令 help 文案是否一致：
+
+```txt
+agentscope --help
+agentscope start --help
+agentscope scope --help
+agentscope config --help
+agentscope evidence --help
+agentscope risk --help
+agentscope report --help
+agentscope gate --help
+agentscope ci --help
+agentscope ci-summary --help
+```
+
+要求：
+
+```txt
+- 不再出现 prototype / dry-run-only 等过期描述。
+- 不承诺未实现能力。
+- gate / report / risk 的区别清楚。
+- ci init / action / summary 的关系清楚。
+```
+
+---
+
+## 6. Release docs
+
+新增：
+
+```txt
+CHANGELOG.md
+docs/release-checklist.md
+```
+
+`CHANGELOG.md` 添加：
+
+```txt
+## 0.1.0 - Unreleased
+
+- Local task scope contract
+- Claude Code runtime enforcement
+- Evidence package
+- Deterministic risk score
+- Scope inference/config/override/history
+- Local policy gate
+- CI workflow template
+- Repo-local GitHub Action
+- CI summary output
+```
+
+`docs/release-checklist.md` 应包含：
+
+```txt
+1. Clean git status
+2. pnpm install
+3. pnpm build
+4. pnpm typecheck
+5. pnpm lint
+6. pnpm test
+7. CLI smoke test
+8. package contents check
+9. README demo check
+10. tag/release instructions
+```
+
+不要执行发布，不要创建 git tag。
+
+---
+
+## 7. Smoke test script
+
+新增：
+
+```txt
+scripts/smoke-test.mjs
+```
+
+目标：
+
+```txt
+在临时 repo 中验证核心 CLI 链路，不依赖 Claude Code live session。
+```
+
+Smoke test 应覆盖：
+
+```txt
+agentscope init
+agentscope start "Fix login redirect bug" --dry-run
+agentscope config validate
+agentscope ci doctor
+agentscope gate --allow-missing-evidence
+agentscope ci-summary --output .agentscope/ci/summary.md
+```
+
+如果可行，也可创建 fixture evidence 后验证：
+
+```txt
+agentscope risk
+agentscope gate
+agentscope ci-summary
+```
+
+要求：
+
+```txt
+- 不访问网络。
+- 不依赖真实 Claude Code。
+- 不修改用户当前 repo。
+- 使用临时目录。
+- 成功 exit 0，失败 exit 1。
+```
+
+在 `package.json` 添加：
 
 ```json
-{
-  "id": "blocked_path_denied",
-  "label": "Blocked path access was denied",
-  "severity": "high",
-  "points": 20,
-  "event_id": "...",
-  "tool_name": "Read",
-  "action": "read",
-  "target": ".env.local",
-  "matched_rule": "blocked_paths:.env*"
-}
+"smoke": "node scripts/smoke-test.mjs"
 ```
-
-Risk factor 的目标是解释：
-
-```txt
-为什么这个 session 有这个风险分？
-哪些 action 贡献了分数？
-```
-
-不要只输出一个裸分数。
 
 ---
 
-## 4. Recommendations
+## 8. Docs consistency pass
 
-根据 factors 生成 deterministic recommendations。
-
-示例：
+检查并更新：
 
 ```txt
-如果有 blocked_paths deny：
-  "Review why the agent attempted to access blocked paths."
-
-如果有 high_risk ask：
-  "Manually review high-risk file changes before merging."
-
-如果有 dangerous command：
-  "Investigate denied dangerous shell commands."
-
-如果风险为 low：
-  "No major policy concerns detected in this session."
+docs/architecture.md
+docs/product-vision.md
+docs/v0-v6-roadmap.md
+docs/ci.md
+docs/quickstart.md
+README.md
+examples/github-actions/README.md
 ```
 
-Recommendations 不要调用 LLM。
-不要生成过度夸张的安全结论。
+确保术语一致：
+
+```txt
+Task Scope Contract
+Evidence Package
+Risk Score
+Policy Gate
+CI Summary
+Claude Code hook
+repo-local reusable action
+```
+
+确保未实现的能力标为 planned，而不是 done。
 
 ---
 
-## 5. CLI
-
-新增命令：
-
-```bash
-agentscope risk
-agentscope risk --json
-```
-
-行为：
-
-```txt
-读取 .agentscope/evidence/latest.json
-计算 RiskScoreV1
-输出 human-readable risk report
-```
-
-Human-readable 输出至少包括：
-
-```txt
-Risk score
-Risk level
-Task
-Scope hash
-Event counts
-Top risk factors
-Recommendations
-Evidence path
-```
-
-`--json` 输出完整 RiskScoreV1 JSON。
-
-如果 evidence 不存在，友好提示，不要 crash。
-
----
-
-## 6. 更新 agentscope report
-
-V1.3 的 `agentscope report` 之前明确说 Risk Scoring 未实现。
-V1.4 后需要更新：
-
-```txt
-agentscope report
-```
-
-应包含 risk score summary：
-
-```txt
-Risk score: 45 / 100
-Risk level: medium
-```
-
-但 `agentscope report` 仍然不是 Policy Gate。
-不要让 report 因高风险返回非零 exit code。
-不要实现 threshold。
-不要实现 CI fail。
-
----
-
-# V1.4 不做什么
+# V3.4 不做什么
 
 不要实现：
 
 ```txt
-❌ Policy Gate
-❌ GitHub Action
-❌ CI failure
-❌ risk threshold enforcement
-❌ agentscope gate
 ❌ SARIF
-❌ signed evidence
-❌ transcript hash
-❌ diff hash
-❌ MCP-specific risk model
+❌ PR comment
+❌ Marketplace Action publishing
+❌ GitHub API integration
+❌ JUnit output
+❌ artifact upload as required behavior
+❌ remote/team policy registry
 ❌ cloud sync
 ❌ Web UI
-❌ LLM-based risk judging
+❌ branch protection integration
+❌ MCP-specific CI gate
+❌ LLM-based policy judging
 ❌ secret scanning
 ❌ file content inspection
 ❌ command output capture
 ```
 
-Policy Gate 是后续版本。
-V1.4 只计算和展示风险。
-
----
-
-# 代码组织建议
-
-优先新增：
+不要改变：
 
 ```txt
-src/core/risk/risk-score.ts
-src/core/risk/risk-engine.ts
-src/core/risk/risk-recommendations.ts
-src/core/risk/index.ts
-```
-
-CLI 新增：
-
-```txt
-src/cli/commands/risk.ts
-```
-
-可复用 V1.3：
-
-```txt
-src/core/evidence/evidence-summary.ts
-src/core/evidence/evidence-store.ts
-src/core/evidence/evidence-package.ts
-```
-
-并更新：
-
-```txt
-src/core/index.ts
-src/cli/index.ts
-src/cli/commands/report.ts
-README.md
-docs/v0-v6-roadmap.md
+❌ agentscope gate semantics
+❌ GateResultV1 schema
+❌ RiskScoreV1 schema
+❌ Evidence schema
+❌ PolicyEngine runtime decisions
+❌ Claude Code hook response mapping
+❌ Scope inference semantics
+❌ Effective config schema
+❌ Scope override behavior
+❌ Scope history behavior
 ```
 
 ---
@@ -409,37 +504,48 @@ docs/v0-v6-roadmap.md
 
 至少覆盖：
 
-```txt
-RiskScore schema parse
-Risk level boundary:
-  0-24 low
-  25-49 medium
-  50-74 high
-  75-100 critical
+## Smoke test
 
-Empty / no-risk evidence → low score
-Read .env.local deny → produces blocked path factor
-Write package.json ask → produces high-risk factor
-Dangerous command deny → produces critical/high factor
-Multiple interventions add session-level factor
-Score clamps to 100
-Allow events do not create risk unless positive risk_delta
-Negative risk_delta never makes total score below 0
-Recommendations generated deterministically
-agentscope risk works
-agentscope risk --json works
-agentscope risk handles missing evidence
-agentscope report includes risk score
-agentscope report does not implement policy gate behavior
+```txt
+scripts/smoke-test.mjs exists
+pnpm smoke runs successfully
+smoke test uses temp directory
+smoke test does not require Claude Code
+smoke test does not require network
+```
+
+## Docs / package sanity
+
+```txt
+README mentions gate and CI summary
+README does not claim SARIF / PR comment / Marketplace as implemented
+CHANGELOG.md exists
+docs/release-checklist.md exists
+docs/quickstart.md exists
+package.json bin/files metadata are sane
+CLI help does not contain stale prototype wording
+```
+
+## Regression
+
+```txt
+agentscope gate behavior unchanged
+risk/report/evidence behavior unchanged
+hook deny/ask/allow unchanged
+scope history commands unchanged
+ci init / ci doctor unchanged
+ci-summary unchanged
+config commands still work
 ```
 
 继续保持：
 
-```txt
+```bash
 pnpm build
 pnpm typecheck
 pnpm lint
 pnpm test
+pnpm smoke
 ```
 
 全部通过。
@@ -448,26 +554,31 @@ pnpm test
 
 # 验收标准
 
-V1.4 通过条件：
+V3.4 通过条件：
 
 ```txt
-1. agentscope risk 可以读取 latest evidence 并输出 score。
-2. agentscope risk --json 输出 RiskScoreV1。
-3. Read .env.local deny 会贡献风险因子。
-4. Write package.json ask 会贡献风险因子。
-5. Write src/auth/login.ts allow 默认不增加风险。
-6. agentscope report 显示 risk score 和 risk level。
-7. V1.4 没有改变 hook allow / deny / ask 行为。
-8. V1.4 没有实现 Policy Gate。
-9. V1.4 没有 CI threshold / failure behavior。
-10. build/typecheck/lint/test 全绿。
+1. README 讲清楚完整 AgentScope demo。
+2. docs/quickstart.md 可复制执行。
+3. examples/live-demo 覆盖 evidence/risk/gate/ci-summary。
+4. package metadata 适合 v0.1.0 发布准备。
+5. CLI help 没有过期描述。
+6. CHANGELOG.md 和 docs/release-checklist.md 存在。
+7. scripts/smoke-test.mjs 存在且 pnpm smoke 通过。
+8. docs 不声称未实现的能力。
+9. 没有改变 gate/risk/evidence/hook/scope 行为。
+10. build/typecheck/lint/test/smoke 全绿。
 ```
 
 ---
 
 # 开发原则
 
-保持实现简单、确定、可解释。
-Risk score 必须能从 evidence 逐项解释。
-不要追求复杂安全模型。
-V1.4 是为后续 Policy Gate 提供基础，不是最终安全产品。
+V3.4 的目标是：
+
+```txt
+make AgentScope understandable, reproducible, and release-ready
+```
+
+这不是功能阶段。
+这是发布前打磨阶段。
+优先清晰、稳定、可信。
