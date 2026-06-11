@@ -41,15 +41,16 @@ When Claude Code tries to read `.env.local`, AgentScope denies it. When it tries
 
 ## Status
 
-V3.1 adds a CI workflow template around the local Policy Gate CLI:
+V3.2 adds a repo-local reusable GitHub Action around the local Policy Gate CLI:
 
 - `agentscope risk` computes score only.
 - `agentscope report` prints an audit summary only and keeps exit code `0`.
 - `agentscope gate` enforces local gate policy from evidence + risk + config and exits `0` on pass/skipped, `1` on fail.
-- `agentscope ci init github-actions` generates a GitHub Actions workflow that runs `agentscope gate`.
-- `agentscope ci doctor` diagnoses whether this repo is ready to run the gate in CI.
-- The workflow is a thin wrapper: it runs `agentscope gate` and respects its exit code. It does not reimplement gate logic.
-- Marketplace Action, reusable GitHub Action, SARIF, PR comments, and GitHub API calls are not implemented in V3.1.
+- `agentscope ci init github-actions --mode direct` generates a GitHub Actions workflow that runs `agentscope gate`.
+- `agentscope ci init github-actions --mode action` generates a workflow that uses the repo-local `action.yml`.
+- `agentscope ci doctor` diagnoses whether this repo is ready to run the gate in CI, including `action.yml`.
+- The workflow and action are thin wrappers: they run `agentscope gate` and respect its exit code. They do not reimplement gate logic.
+- Marketplace Action publishing, SARIF, PR comments, and GitHub API calls are not implemented in V3.2.
 
 - �?Claude Code supported (live runtime enforcement)
 - �?Project-local config (`.agentscope/config.yaml`) for policy + inference tuning
@@ -57,9 +58,10 @@ V3.1 adds a CI workflow template around the local Policy Gate CLI:
 - �?Team Policy Registry �?**not implemented yet** (planned, V4)
 - Policy Gate CLI (`agentscope gate`) - implemented in V3.0
 - CI workflow template (`agentscope ci init` / `agentscope ci doctor`) - implemented in V3.1
-- Reusable GitHub Action - **not implemented yet** (planned, V3.2)
+- Repo-local reusable GitHub Action - implemented in V3.2
+- Marketplace GitHub Action - **not implemented yet**
 - SARIF / CI report - **not implemented yet** (planned, V3.3)
-- GitHub Action / SARIF / PR comments - **not implemented yet**
+- SARIF / PR comments - **not implemented yet**
 
 `agentscope risk` and `agentscope report` are read-only summaries. They never fail CI, apply no threshold, and never change hook enforcement.
 
@@ -315,13 +317,26 @@ agentscope ci init github-actions
 git add .github/workflows/agentscope-gate.yml
 ```
 
-The workflow runs `agentscope gate`. Gate exit code controls CI pass/fail. The workflow does not reimplement gate logic.
+The default direct workflow runs `pnpm exec agentscope gate --json`. Gate exit code controls CI pass/fail. The workflow does not reimplement gate logic.
 
 ```bash
+agentscope ci init github-actions --mode direct
+agentscope ci init github-actions --mode action
 agentscope ci init github-actions --package-manager npm
 agentscope ci init github-actions --allow-missing-evidence
 agentscope ci init github-actions --force
 ```
+
+Repo-local action workflow mode uses:
+
+```yaml
+- name: Run AgentScope Gate
+  uses: ./
+  with:
+    package-manager: pnpm
+```
+
+The action exposes `status`, `score`, `level`, and `result-path` outputs.
 
 Check CI readiness with:
 
@@ -330,7 +345,7 @@ agentscope ci doctor
 agentscope ci doctor --json
 ```
 
-See [docs/ci.md](docs/ci.md) for the full guide. This is local-only and CI-only; V3.1 does not implement a Marketplace Action, reusable GitHub Action, SARIF, PR comments, or GitHub API calls.
+See [docs/ci.md](docs/ci.md) for the full guide. This is local-only and CI-only; V3.2 does not implement a Marketplace Action, SARIF, PR comments, or GitHub API calls.
 
 ## Configuration
 

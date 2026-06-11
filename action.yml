@@ -1,0 +1,106 @@
+name: "AgentScope Gate"
+description: "Run agentscope gate as a repo-local composite action."
+
+inputs:
+  package-manager:
+    description: "Package manager used to run AgentScope."
+    required: false
+    default: "pnpm"
+  working-directory:
+    description: "Directory where AgentScope should run."
+    required: false
+    default: "."
+  allow-missing-evidence:
+    description: "Allow missing evidence and skip the gate instead of failing."
+    required: false
+    default: "false"
+  install-command:
+    description: "Command used to install dependencies before running AgentScope."
+    required: false
+    default: ""
+  gate-command:
+    description: "Override the AgentScope gate command."
+    required: false
+    default: ""
+
+outputs:
+  status:
+    description: "Gate status: pass, fail, or skipped."
+    value: ${{ steps.parse.outputs.status }}
+  score:
+    description: "Risk score from the gate result."
+    value: ${{ steps.parse.outputs.score }}
+  level:
+    description: "Risk level from the gate result."
+    value: ${{ steps.parse.outputs.level }}
+  result-path:
+    description: "Path to the gate result JSON."
+    value: ${{ steps.run-gate.outputs.result-path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install dependencies
+      if: ${{ inputs.install-command != '' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: ${{ inputs.install-command }}
+
+    - name: Run AgentScope gate
+      id: run-gate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        mkdir -p .agentscope/ci
+
+        if [ -n "${{ inputs.gate-command }}" ]; then
+          GATE_COMMAND="${{ inputs.gate-command }}"
+        elif [ "${{ inputs.package-manager }}" = "npm" ]; then
+          GATE_COMMAND="npx agentscope gate --json"
+        else
+          GATE_COMMAND="pnpm exec agentscope gate --json"
+        fi
+
+        if [ "${{ inputs.allow-missing-evidence }}" = "true" ]; then
+          GATE_COMMAND="$GATE_COMMAND --allow-missing-evidence"
+        fi
+
+        echo "result-path=.agentscope/ci/gate-result.json" >> "$GITHUB_OUTPUT"
+
+        set +e
+        eval "$GATE_COMMAND" > .agentscope/ci/gate-result.json
+        code=$?
+        set -e
+        cat .agentscope/ci/gate-result.json
+        echo "gate-exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit 0
+
+    - name: Parse gate result
+      id: parse
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        node <<'NODE' >> "$GITHUB_OUTPUT"
+        const fs = require("fs");
+        const resultPath = ".agentscope/ci/gate-result.json";
+        let status = "";
+        let score = "";
+        let level = "";
+        if (fs.existsSync(resultPath)) {
+          try {
+            const result = JSON.parse(fs.readFileSync(resultPath, "utf8"));
+            status = result.status ?? "";
+            score = result.risk?.score ?? "";
+            level = result.risk?.level ?? "";
+          } catch {
+            status = "";
+          }
+        }
+        console.log(`status=${status}`);
+        console.log(`score=${score}`);
+        console.log(`level=${level}`);
+        NODE
+
+    - name: Enforce gate result
+      shell: bash
+      run: exit "${{ steps.run-gate.outputs.gate-exit-code }}"

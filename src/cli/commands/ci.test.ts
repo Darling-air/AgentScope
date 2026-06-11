@@ -158,6 +158,30 @@ describe("ci init github-actions", () => {
     expect(process.exitCode).toBe(0);
   });
 
+  it("--mode direct works", () => {
+    const dir = makeProject();
+    process.chdir(dir);
+
+    ciInitGithubActionsCommand({ mode: "direct" });
+
+    const workflow = readFileSync(workflowPath(dir), "utf8");
+    expect(workflow).toContain("pnpm exec agentscope gate --json");
+    expect(workflow).not.toContain("uses: ./");
+    expect(process.exitCode).toBe(0);
+  });
+
+  it("--mode action works", () => {
+    const dir = makeProject();
+    process.chdir(dir);
+
+    ciInitGithubActionsCommand({ mode: "action" });
+
+    const workflow = readFileSync(workflowPath(dir), "utf8");
+    expect(workflow).toContain("uses: ./");
+    expect(workflow).toContain("package-manager: pnpm");
+    expect(process.exitCode).toBe(0);
+  });
+
   it("refuses to overwrite existing file without --force", () => {
     const dir = makeProject();
     mkdirSync(path.dirname(workflowPath(dir)), { recursive: true });
@@ -216,6 +240,28 @@ describe("ci init github-actions", () => {
     );
   });
 
+  it("--allow-missing-evidence works with action mode", () => {
+    const dir = makeProject();
+    process.chdir(dir);
+
+    ciInitGithubActionsCommand({ mode: "action", allowMissingEvidence: true });
+
+    expect(readFileSync(workflowPath(dir), "utf8")).toContain(
+      "allow-missing-evidence: true",
+    );
+  });
+
+  it("--package-manager npm works with action mode", () => {
+    const dir = makeProject();
+    process.chdir(dir);
+
+    ciInitGithubActionsCommand({ mode: "action", packageManager: "npm" });
+
+    const workflow = readFileSync(workflowPath(dir), "utf8");
+    expect(workflow).toContain("npm ci");
+    expect(workflow).toContain("package-manager: npm");
+  });
+
   it("invalid package manager errors clearly", () => {
     const dir = makeProject();
     process.chdir(dir);
@@ -223,6 +269,17 @@ describe("ci init github-actions", () => {
     ciInitGithubActionsCommand({ packageManager: "yarn" });
 
     expect(allOut()).toContain("Invalid package manager");
+    expect(process.exitCode).toBe(1);
+    expect(existsSync(workflowPath(dir))).toBe(false);
+  });
+
+  it("invalid mode errors clearly", () => {
+    const dir = makeProject();
+    process.chdir(dir);
+
+    ciInitGithubActionsCommand({ mode: "marketplace" });
+
+    expect(allOut()).toContain("Invalid CI mode");
     expect(process.exitCode).toBe(1);
     expect(existsSync(workflowPath(dir))).toBe(false);
   });
@@ -263,6 +320,27 @@ describe("ci doctor", () => {
     expect(process.exitCode).toBe(0);
   });
 
+  it("reports action.yml found", () => {
+    const dir = makeProject();
+    writeFileSync(path.join(dir, "action.yml"), "name: test\n", "utf8");
+    process.chdir(dir);
+
+    ciDoctorCommand();
+
+    expect(logOut()).toContain("Action: found");
+    expect(process.exitCode).toBe(0);
+  });
+
+  it("reports action.yml missing", () => {
+    const dir = makeProject();
+    process.chdir(dir);
+
+    ciDoctorCommand();
+
+    expect(logOut()).toContain("Action: missing");
+    expect(process.exitCode).toBe(0);
+  });
+
   it("reports config found", () => {
     const dir = makeProject();
     process.chdir(dir);
@@ -291,7 +369,26 @@ describe("ci doctor", () => {
     expect(parsed.config.status).toBe("found");
     expect(parsed.evidence.status).toBe("missing");
     expect(parsed.workflow.status).toBe("missing");
+    expect(parsed.action.status).toBe("missing");
     expect(parsed.package.status).toBe("found");
+  });
+
+  it("recommends action.yml when workflow uses local action but action is missing", () => {
+    const dir = makeProject();
+    mkdirSync(path.dirname(workflowPath(dir)), { recursive: true });
+    writeFileSync(
+      workflowPath(dir),
+      "steps:\n  - name: Run AgentScope Gate\n    uses: ./\n",
+      "utf8",
+    );
+    process.chdir(dir);
+
+    ciDoctorCommand();
+
+    expect(logOut()).toContain(
+      "Workflow appears to use the local AgentScope action, but action.yml is missing.",
+    );
+    expect(process.exitCode).toBe(0);
   });
 
   it("exit code remains 0 for diagnostic missing items", () => {

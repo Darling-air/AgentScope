@@ -1,0 +1,23 @@
+name: AgentScope Gate Action
+
+on:
+  pull_request:
+
+jobs:
+  agentscope-gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run AgentScope Gate
+        uses: ./
+        with:
+          package-manager: pnpm

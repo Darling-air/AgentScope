@@ -1,4 +1,4 @@
-# AgentScope V0-V6 Roadmap
+﻿# AgentScope V0-V6 Roadmap
 
 Current implementation status:
 
@@ -6,89 +6,90 @@ Current implementation status:
 V2.2  done     Scope Review / Override UX
 V2.3  done     Multi-task Scope History
 V3.0  done     Local Policy Gate CLI (`agentscope gate`)
-V3.1  planned  GitHub Action
-V3.2  planned  SARIF / PR comments / CI report
+V3.1  done     CI workflow template
+V3.2  done     Repo-local reusable GitHub Action
+V3.3  planned  SARIF / PR comments / CI report
 V4    planned  Team Policy Registry
 ```
 
-V3.0 is local-only. It does not implement GitHub Action, SARIF, PR comments, remote/team policy, cloud sync, or branch protection integration.
+V3.2 is local-only and CI-only. It implements a repo-local reusable GitHub Action, but does not implement Marketplace Action publishing, SARIF, PR comments, GitHub API calls, remote/team policy, cloud sync, or branch protection integration.
 
-## 总体路线
+## 鎬讳綋璺嚎
 
-AgentScope 的开发路线分为七个阶段：
+AgentScope 鐨勫紑鍙戣矾绾垮垎涓轰竷涓樁娈碉細
 
-V0: 本地原型
+V0: 鏈湴鍘熷瀷
 V1: Claude Code MVP
-V2: Scope Auto Inference 深化
+V2: Scope Auto Inference 娣卞寲
 V3: Evidence + Policy Gate
 V4: Team Policy Registry
 V5: Multi-Agent Governance
 V6: Enterprise Governance
 
-核心主线：
+鏍稿績涓荤嚎锛?
 
 Task
-→ Scope Auto Inference
-→ Human Approval
-→ Runtime Enforcement
-→ Evidence Package
-→ Risk Scoring
-→ Policy Gate
+鈫?Scope Auto Inference
+鈫?Human Approval
+鈫?Runtime Enforcement
+鈫?Evidence Package
+鈫?Risk Scoring
+鈫?Policy Gate
 
-## 当前进度概览
+## 褰撳墠杩涘害姒傝
 
 ```txt
-V0    ✅ done    本地 Task Scope Contract + git diff check
-V1.0  ✅ done    Core Policy Engine (ToolEvent → PolicyDecision)
-V1.1  ✅ done    Claude Code PreToolUse translator + hook entrypoint
-V1.2  ✅ done    Claude Code hook installer + live runtime enforcement
-V1.3  ✅ done    Evidence Event Recorder
-V1.4  ✅ done    Deterministic Risk Score V1
-V1.5  ✅ done    GitHub-ready demo polish (README / examples / docs / packaging)
-V2.0  ✅ done    Scope Inference V2 (deterministic classifier + rule packs)
-V2.1  ✅ done    Policy Config Improvements (.agentscope/config.yaml + effective config)
-V2.2  ▶ current  Scope Review / Override UX (scope explain/diff/apply + start override flags)
-V3    ⏳ planned Evidence + Policy Gate + GitHub Action
-V4    ⏳ planned Team Policy Registry
-V5    ⏳ planned Multi-Agent Governance
-V6    ⏳ planned Enterprise Governance
+V0    鉁?done    鏈湴 Task Scope Contract + git diff check
+V1.0  鉁?done    Core Policy Engine (ToolEvent 鈫?PolicyDecision)
+V1.1  鉁?done    Claude Code PreToolUse translator + hook entrypoint
+V1.2  鉁?done    Claude Code hook installer + live runtime enforcement
+V1.3  鉁?done    Evidence Event Recorder
+V1.4  鉁?done    Deterministic Risk Score V1
+V1.5  鉁?done    GitHub-ready demo polish (README / examples / docs / packaging)
+V2.0  鉁?done    Scope Inference V2 (deterministic classifier + rule packs)
+V2.1  鉁?done    Policy Config Improvements (.agentscope/config.yaml + effective config)
+V2.2  鈻?current  Scope Review / Override UX (scope explain/diff/apply + start override flags)
+V3    鈴?planned Evidence + Policy Gate + GitHub Action
+V4    鈴?planned Team Policy Registry
+V5    鈴?planned Multi-Agent Governance
+V6    鈴?planned Enterprise Governance
 ```
 
-Policy Gate 和 GitHub Action 仍属于 V3，**尚未实现**；Team Policy Registry 属于 V4，**尚未实现**。V2.2 只做 scope review/override UX（`scope explain` / `scope diff` / `scope apply`、`start` 的 override flags、纯函数 `applyScopeOverride` / `diffScopes`），override 只影响单个 active scope、**不修改 config.yaml**、不改变 runtime enforcement 语义。
+Policy Gate 鍜?GitHub Action 浠嶅睘浜?V3锛?*灏氭湭瀹炵幇**锛汿eam Policy Registry 灞炰簬 V4锛?*灏氭湭瀹炵幇**銆俈2.2 鍙仛 scope review/override UX锛坄scope explain` / `scope diff` / `scope apply`銆乣start` 鐨?override flags銆佺函鍑芥暟 `applyScopeOverride` / `diffScopes`锛夛紝override 鍙奖鍝嶅崟涓?active scope銆?*涓嶄慨鏀?config.yaml**銆佷笉鏀瑰彉 runtime enforcement 璇箟銆?
 
-## V0：本地原型版
+## V0锛氭湰鍦板師鍨嬬増
 
-### 目标
+### 鐩爣
 
-验证 AgentScope 最核心的体验：
+楠岃瘉 AgentScope 鏈€鏍稿績鐨勪綋楠岋細
 
 agentscope start "Fix login redirect bug"
 
-能够生成一个 Task Scope Contract，并用它检查当前 git diff 是否越界。
+鑳藉鐢熸垚涓€涓?Task Scope Contract锛屽苟鐢ㄥ畠妫€鏌ュ綋鍓?git diff 鏄惁瓒婄晫銆?
 
-V0 不需要接入 Claude Code。
+V0 涓嶉渶瑕佹帴鍏?Claude Code銆?
 
-V0 的目标是证明：
+V0 鐨勭洰鏍囨槸璇佹槑锛?
 
-自然语言任务可以转换成最小权限边界。
+鑷劧璇█浠诲姟鍙互杞崲鎴愭渶灏忔潈闄愯竟鐣屻€?
 
-### 必须实现
+### 蹇呴』瀹炵幇
 
-1. CLI 基础框架
+1. CLI 鍩虹妗嗘灦
 2. `agentscope init`
 3. `agentscope start "<task>"`
-4. Task Scope Contract 初版生成
-5. 用户确认流程
+4. Task Scope Contract 鍒濈増鐢熸垚
+5. 鐢ㄦ埛纭娴佺▼
 6. `.agentscope/current-scope.yaml`
 7. `agentscope show`
 8. `agentscope check`
-9. 基于 git diff 的 scope 检查
+9. 鍩轰簬 git diff 鐨?scope 妫€鏌?
 
-### 推荐命令
+### 鎺ㄨ崘鍛戒护
 
 agentscope init
 
-生成：
+鐢熸垚锛?
 
 .agentscope/
   config.yaml
@@ -98,7 +99,7 @@ agentscope init
 
 agentscope start "Fix login redirect bug"
 
-生成：
+鐢熸垚锛?
 
 task:
   id: fix-login-redirect
@@ -126,111 +127,111 @@ high_risk:
 
 agentscope check
 
-输出：
+杈撳嚭锛?
 
 Scope Check
 
-✅ src/auth/login.ts is within allowed paths
-✅ tests/auth/login.test.ts is within allowed paths
-⚠ package.json is high risk
-❌ .github/workflows/deploy.yml is blocked
+鉁?src/auth/login.ts is within allowed paths
+鉁?tests/auth/login.test.ts is within allowed paths
+鈿?package.json is high risk
+鉂?.github/workflows/deploy.yml is blocked
 
-### V0 Scope Inference 规则
+### V0 Scope Inference 瑙勫垯
 
-V0 只做简单推断：
+V0 鍙仛绠€鍗曟帹鏂細
 
-- 读取 package.json
-- 识别 npm / pnpm / yarn
-- 识别 test / lint scripts
-- 根据任务关键词匹配路径名
-- 默认 blocked_paths
-- 默认 high_risk paths
-- 默认 allowed_paths 回退到 src/** 和 tests/**
+- 璇诲彇 package.json
+- 璇嗗埆 npm / pnpm / yarn
+- 璇嗗埆 test / lint scripts
+- 鏍规嵁浠诲姟鍏抽敭璇嶅尮閰嶈矾寰勫悕
+- 榛樿 blocked_paths
+- 榛樿 high_risk paths
+- 榛樿 allowed_paths 鍥為€€鍒?src/** 鍜?tests/**
 
-不做复杂 AST。
-不做 LLM。
-不做 git history 深度分析。
-不做 import graph。
+涓嶅仛澶嶆潅 AST銆?
+涓嶅仛 LLM銆?
+涓嶅仛 git history 娣卞害鍒嗘瀽銆?
+涓嶅仛 import graph銆?
 
-### V0 不做
+### V0 涓嶅仛
 
 - Claude Code hooks
 - Claude Code adapter
 - GitHub Action
-- Evidence Package 完整 schema
-- Risk Scoring 完整规则
+- Evidence Package 瀹屾暣 schema
+- Risk Scoring 瀹屾暣瑙勫垯
 - MCP
 - Web UI
-- 多 agent
-- 云端服务
+- 澶?agent
+- 浜戠鏈嶅姟
 
-### V0 验收标准
+### V0 楠屾敹鏍囧噯
 
-在一个真实 repo 中可以完成：
+鍦ㄤ竴涓湡瀹?repo 涓彲浠ュ畬鎴愶細
 
 agentscope init
 agentscope start "Fix login redirect bug"
 agentscope check
 
-并得到合理的 scope check 结果。
+骞跺緱鍒板悎鐞嗙殑 scope check 缁撴灉銆?
 
 ---
 
-## V1：Claude Code MVP
+## V1锛欳laude Code MVP
 
-### 当前状态
+### 褰撳墠鐘舵€?
 
-V1 拆分为 V1.0–V1.4 子阶段，进度如下：
+V1 鎷嗗垎涓?V1.0鈥揤1.4 瀛愰樁娈碉紝杩涘害濡備笅锛?
 
-- ✅ **V1.0 已完成** — agent-agnostic policy engine（`ToolEvent` → `PolicyDecision`，PolicyEngine、CommandMatcher）。
-- ✅ **V1.1 已完成** — Claude Code PreToolUse payload schema + dry-run hook translator（`agentscope hook claude-code pre-tool-use`）。
-- ✅ **V1.2 已完成** — Claude Code hook installer。`agentscope install claude-code` 把 PreToolUse hook 安全注入 Claude Code settings，实现 **live runtime enforcement**：Read / Edit / Write / Bash 在运行时受 Task Scope Contract 约束。
-  - 默认写入 `.claude/settings.local.json`，仅 `--shared` 才写入 `.claude/settings.json`。
-  - 支持 Windows / POSIX 绝对路径归一化为 repo-relative path，跨平台 glob 匹配一致。
-  - live demo：Read `.env.local` → **deny**；Edit `package.json` → **ask**；Edit `src/auth/login.ts` → **allow**。
-- ✅ **V1.3 已完成** — Evidence Event Recorder + Evidence Package。每次 live policy decision 追加到 `.agentscope/evidence/latest.json`；`agentscope evidence show` / `evidence clear` / `report` 可用；仅记录 governance metadata。
-- ✅ **V1.4 已完成** — Risk Score V1。`agentscope risk` / `agentscope risk --json` 从 Evidence Package 计算确定性 0–100 风险分（low / medium / high / critical），附 per-factor 分解与 recommendations；`agentscope report` 现已包含 risk score。
-  - 纯函数 `calculateRiskScore`：同一 evidence 输入得到同一输出，不调 LLM、不联网、不依赖时间、不读文件内容、不改 hook 行为。
-  - **不是 Policy Gate**：risk / report 都不设非零 exit code、无 threshold、不 fail CI。Policy Gate 属于后续 V3。
+- 鉁?**V1.0 宸插畬鎴?* 鈥?agent-agnostic policy engine锛坄ToolEvent` 鈫?`PolicyDecision`锛孭olicyEngine銆丆ommandMatcher锛夈€?
+- 鉁?**V1.1 宸插畬鎴?* 鈥?Claude Code PreToolUse payload schema + dry-run hook translator锛坄agentscope hook claude-code pre-tool-use`锛夈€?
+- 鉁?**V1.2 宸插畬鎴?* 鈥?Claude Code hook installer銆俙agentscope install claude-code` 鎶?PreToolUse hook 瀹夊叏娉ㄥ叆 Claude Code settings锛屽疄鐜?**live runtime enforcement**锛歊ead / Edit / Write / Bash 鍦ㄨ繍琛屾椂鍙?Task Scope Contract 绾︽潫銆?
+  - 榛樿鍐欏叆 `.claude/settings.local.json`锛屼粎 `--shared` 鎵嶅啓鍏?`.claude/settings.json`銆?
+  - 鏀寔 Windows / POSIX 缁濆璺緞褰掍竴鍖栦负 repo-relative path锛岃法骞冲彴 glob 鍖归厤涓€鑷淬€?
+  - live demo锛歊ead `.env.local` 鈫?**deny**锛汦dit `package.json` 鈫?**ask**锛汦dit `src/auth/login.ts` 鈫?**allow**銆?
+- 鉁?**V1.3 宸插畬鎴?* 鈥?Evidence Event Recorder + Evidence Package銆傛瘡娆?live policy decision 杩藉姞鍒?`.agentscope/evidence/latest.json`锛沗agentscope evidence show` / `evidence clear` / `report` 鍙敤锛涗粎璁板綍 governance metadata銆?
+- 鉁?**V1.4 宸插畬鎴?* 鈥?Risk Score V1銆俙agentscope risk` / `agentscope risk --json` 浠?Evidence Package 璁＄畻纭畾鎬?0鈥?00 椋庨櫓鍒嗭紙low / medium / high / critical锛夛紝闄?per-factor 鍒嗚В涓?recommendations锛沗agentscope report` 鐜板凡鍖呭惈 risk score銆?
+  - 绾嚱鏁?`calculateRiskScore`锛氬悓涓€ evidence 杈撳叆寰楀埌鍚屼竴杈撳嚭锛屼笉璋?LLM銆佷笉鑱旂綉銆佷笉渚濊禆鏃堕棿銆佷笉璇绘枃浠跺唴瀹广€佷笉鏀?hook 琛屼负銆?
+  - **涓嶆槸 Policy Gate**锛歳isk / report 閮戒笉璁鹃潪闆?exit code銆佹棤 threshold銆佷笉 fail CI銆侾olicy Gate 灞炰簬鍚庣画 V3銆?
 
-下面这一节 V1 的“必须实现”是原始 MVP 规划，现已全部落地：Event log / Evidence Package（V1.3）、Risk Scoring（V1.4）均已实现。仅 GitHub Action / Policy Gate 仍属于 V3，尚未实现。
+涓嬮潰杩欎竴鑺?V1 鐨勨€滃繀椤诲疄鐜扳€濇槸鍘熷 MVP 瑙勫垝锛岀幇宸插叏閮ㄨ惤鍦帮細Event log / Evidence Package锛圴1.3锛夈€丷isk Scoring锛圴1.4锛夊潎宸插疄鐜般€備粎 GitHub Action / Policy Gate 浠嶅睘浜?V3锛屽皻鏈疄鐜般€?
 
-### 目标
+### 鐩爣
 
-做出第一个可开源发布、可录制 demo 的版本。
+鍋氬嚭绗竴涓彲寮€婧愬彂甯冦€佸彲褰曞埗 demo 鐨勭増鏈€?
 
-V1 核心体验：
+V1 鏍稿績浣撻獙锛?
 
-1. AgentScope 生成 Task Scope Contract
-2. 用户确认
-3. Claude Code 启动
-4. Claude Code 尝试越界操作
-5. AgentScope 拦截
-6. 生成 evidence.json
-7. 输出 risk score
+1. AgentScope 鐢熸垚 Task Scope Contract
+2. 鐢ㄦ埛纭
+3. Claude Code 鍚姩
+4. Claude Code 灏濊瘯瓒婄晫鎿嶄綔
+5. AgentScope 鎷︽埅
+6. 鐢熸垚 evidence.json
+7. 杈撳嚭 risk score
 
-### 必须实现
+### 蹇呴』瀹炵幇
 
 1. Claude Code adapter
-2. Claude Code hook 安装
-3. PreToolUse 策略拦截
-4. Read / Edit / Write / Bash 支持
+2. Claude Code hook 瀹夎
+3. PreToolUse 绛栫暐鎷︽埅
+4. Read / Edit / Write / Bash 鏀寔
 5. Event log
 6. Evidence Package V1
 7. Risk Scoring V1
 8. Markdown report V1
 
-### 推荐命令
+### 鎺ㄨ崘鍛戒护
 
 agentscope install claude-code
 
-作用：
+浣滅敤锛?
 
-- 检测 `.claude/settings.json`
-- 备份原有 settings
-- 注入 AgentScope hooks
-- 配置 PreToolUse hook
-- 指向 current-scope.yaml
+- 妫€娴?`.claude/settings.json`
+- 澶囦唤鍘熸湁 settings
+- 娉ㄥ叆 AgentScope hooks
+- 閰嶇疆 PreToolUse hook
+- 鎸囧悜 current-scope.yaml
 
 agentscope start "Fix login redirect bug"
 
@@ -242,35 +243,35 @@ agentscope report
 
 agentscope risk
 
-### V1 策略决策
+### V1 绛栫暐鍐崇瓥
 
-支持决策：
+鏀寔鍐崇瓥锛?
 
 - allow
 - deny
 - ask
 - warn
 
-策略：
+绛栫暐锛?
 
 Read:
-- 命中 blocked_paths → deny
-- 其他 → allow
+- 鍛戒腑 blocked_paths 鈫?deny
+- 鍏朵粬 鈫?allow
 
 Edit / Write:
-- 命中 blocked_paths → deny
-- 命中 high_risk → ask 或 warn
-- 不在 allowed_paths → ask 或 deny
-- 在 allowed_paths → allow
+- 鍛戒腑 blocked_paths 鈫?deny
+- 鍛戒腑 high_risk 鈫?ask 鎴?warn
+- 涓嶅湪 allowed_paths 鈫?ask 鎴?deny
+- 鍦?allowed_paths 鈫?allow
 
 Bash:
-- 命中 dangerous_commands → deny
-- 在 allowed_commands → allow
-- 未知命令 → ask 或 warn
+- 鍛戒腑 dangerous_commands 鈫?deny
+- 鍦?allowed_commands 鈫?allow
+- 鏈煡鍛戒护 鈫?ask 鎴?warn
 
 ### V1 Dangerous Command Patterns
 
-默认危险命令：
+榛樿鍗遍櫓鍛戒护锛?
 
 - rm -rf *
 - curl * | sh
@@ -285,11 +286,11 @@ Bash:
 
 ### V1 Evidence Package
 
-V1 evidence 文件：
+V1 evidence 鏂囦欢锛?
 
 .agentscope/evidence/latest.json
 
-基础字段：
+鍩虹瀛楁锛?
 
 {
   "version": "0.1",
@@ -317,47 +318,47 @@ V1 evidence 文件：
 
 ### V1 Risk Scoring
 
-初版规则：
+鍒濈増瑙勫垯锛?
 
-- +40 修改 blocked_paths
-- +25 修改 high_risk paths
-- +20 发生 denied action
-- +20 执行非 allowed command
-- +15 修改 allowed_paths 外文件
-- -10 所有修改都在 allowed_paths
-- -15 测试命令成功
+- +40 淇敼 blocked_paths
+- +25 淇敼 high_risk paths
+- +20 鍙戠敓 denied action
+- +20 鎵ц闈?allowed command
+- +15 淇敼 allowed_paths 澶栨枃浠?
+- -10 鎵€鏈変慨鏀归兘鍦?allowed_paths
+- -15 娴嬭瘯鍛戒护鎴愬姛
 
-分级：
+鍒嗙骇锛?
 
 - 0-24 Low
 - 25-49 Medium
 - 50-79 High
 - 80+ Critical
 
-### V1 不做
+### V1 涓嶅仛
 
-- 多 agent
+- 澶?agent
 - GitHub Action
 - Team Policy Registry
-- Scope Auto Inference 深度优化
+- Scope Auto Inference 娣卞害浼樺寲
 - Web dashboard
-- MCP 专项功能
-- 云端服务
+- MCP 涓撻」鍔熻兘
+- 浜戠鏈嶅姟
 
-### V1 验收标准
+### V1 楠屾敹鏍囧噯
 
-能够录制完整 demo：
+鑳藉褰曞埗瀹屾暣 demo锛?
 
 agentscope start "Fix login redirect bug"
 claude
 
-Claude 尝试读取 .env.local，被 AgentScope 拦截。
+Claude 灏濊瘯璇诲彇 .env.local锛岃 AgentScope 鎷︽埅銆?
 
-Claude 修改 src/auth/login.ts。
+Claude 淇敼 src/auth/login.ts銆?
 
-Claude 执行 npm test。
+Claude 鎵ц npm test銆?
 
-agentscope report 输出：
+agentscope report 杈撳嚭锛?
 
 - task
 - scope
@@ -367,29 +368,29 @@ agentscope report 输出：
 
 ---
 
-## V2：Scope Auto Inference 深化版
+## V2锛歋cope Auto Inference 娣卞寲鐗?
 
-### 目标
+### 鐩爣
 
-把 AgentScope 的护城河做深。
+鎶?AgentScope 鐨勬姢鍩庢渤鍋氭繁銆?
 
-V2 要让系统更准确地自动推断本次任务的最小权限边界。
+V2 瑕佽绯荤粺鏇村噯纭湴鑷姩鎺ㄦ柇鏈浠诲姟鐨勬渶灏忔潈闄愯竟鐣屻€?
 
-### 必须实现
+### 蹇呴』瀹炵幇
 
 1. Repo Scanner
 2. Project Type Detection
 3. Task Keyword Matcher
 4. Git History Signal
 5. Test Mapping
-6. Import Graph Signal 初版
+6. Import Graph Signal 鍒濈増
 7. Confidence Scoring
-8. Rationale 输出
+8. Rationale 杈撳嚭
 9. Scope Diff
 
 ### Repo Scanner
 
-识别：
+璇嗗埆锛?
 
 - src/
 - app/
@@ -404,7 +405,7 @@ V2 要让系统更准确地自动推断本次任务的最小权限边界。
 - infra/
 - .github/
 
-识别项目类型：
+璇嗗埆椤圭洰绫诲瀷锛?
 
 - Next.js
 - React
@@ -416,7 +417,7 @@ V2 要让系统更准确地自动推断本次任务的最小权限边界。
 - Spring Boot
 - Monorepo
 
-输出 repo profile：
+杈撳嚭 repo profile锛?
 
 {
   "framework": "nextjs",
@@ -428,11 +429,11 @@ V2 要让系统更准确地自动推断本次任务的最小权限边界。
 
 ### Task Keyword Matcher
 
-任务：
+浠诲姟锛?
 
 Fix login redirect bug
 
-提取关键词：
+鎻愬彇鍏抽敭璇嶏細
 
 - login
 - redirect
@@ -440,13 +441,13 @@ Fix login redirect bug
 - session
 - route
 
-匹配路径：
+鍖归厤璺緞锛?
 
 - src/auth/**
 - src/routes/login/**
 - tests/auth/**
 
-匹配文件：
+鍖归厤鏂囦欢锛?
 
 - login.ts
 - auth.ts
@@ -456,73 +457,73 @@ Fix login redirect bug
 
 ### Git History Signal
 
-使用 git log 查找：
+浣跨敤 git log 鏌ユ壘锛?
 
-- 最近相关变更文件
-- 经常一起修改的文件
-- 历史 bugfix 涉及路径
+- 鏈€杩戠浉鍏冲彉鏇存枃浠?
+- 缁忓父涓€璧蜂慨鏀圭殑鏂囦欢
+- 鍘嗗彶 bugfix 娑夊強璺緞
 
-例如：
+渚嬪锛?
 
 src/auth/login.ts appeared in 7 recent auth-related commits.
 tests/auth/login.test.ts often changes with src/auth/login.ts.
 
 ### Test Mapping
 
-从源文件推断测试文件：
+浠庢簮鏂囦欢鎺ㄦ柇娴嬭瘯鏂囦欢锛?
 
 src/auth/login.ts
 
-可能对应：
+鍙兘瀵瑰簲锛?
 
 - tests/auth/login.test.ts
 - src/auth/__tests__/login.test.ts
 - src/auth/login.spec.ts
 
-输出 required tests：
+杈撳嚭 required tests锛?
 
 required_commands:
   - npm test -- auth
 
-如果无法精确推断，回退：
+濡傛灉鏃犳硶绮剧‘鎺ㄦ柇锛屽洖閫€锛?
 
 allowed_commands:
   - npm test
 
 ### Import Graph Signal
 
-V2 先支持 TypeScript / JavaScript。
+V2 鍏堟敮鎸?TypeScript / JavaScript銆?
 
-轻量解析：
+杞婚噺瑙ｆ瀽锛?
 
 - import statements
 - export statements
 - relative imports
 
-目的：
+鐩殑锛?
 
-- 找源文件和测试文件关系
-- 找受影响模块
-- 提高 confidence
+- 鎵炬簮鏂囦欢鍜屾祴璇曟枃浠跺叧绯?
+- 鎵惧彈褰卞搷妯″潡
+- 鎻愰珮 confidence
 
-不要在 V2 做完整语言服务器。
+涓嶈鍦?V2 鍋氬畬鏁磋瑷€鏈嶅姟鍣ㄣ€?
 
 ### Confidence Scoring
 
-输出：
+杈撳嚭锛?
 
 confidence: 0.87
 
-分级：
+鍒嗙骇锛?
 
 - 0.90+ high
 - 0.70-0.89 medium-high
 - 0.50-0.69 medium
-- <0.50 low，需要用户编辑
+- <0.50 low锛岄渶瑕佺敤鎴风紪杈?
 
 ### Rationale
 
-必须解释为什么推断这些路径：
+蹇呴』瑙ｉ噴涓轰粈涔堟帹鏂繖浜涜矾寰勶細
 
 rationale:
   - "Task contains auth-related keywords: login, redirect"
@@ -532,7 +533,7 @@ rationale:
 
 ### Scope Diff
 
-如果用户编辑 scope，显示差异：
+濡傛灉鐢ㄦ埛缂栬緫 scope锛屾樉绀哄樊寮傦細
 
 You added:
 + src/routes/**
@@ -543,23 +544,23 @@ You removed:
 Warning:
 Removing tests/auth/** may reduce test evidence quality.
 
-### V2 不做
+### V2 涓嶅仛
 
-- LLM 默认推断
-- 云端索引
-- 复杂 AST
-- 多 agent
-- 企业 dashboard
+- LLM 榛樿鎺ㄦ柇
+- 浜戠绱㈠紩
+- 澶嶆潅 AST
+- 澶?agent
+- 浼佷笟 dashboard
 
-可以支持可选：
+鍙互鏀寔鍙€夛細
 
 agentscope start "Fix login redirect bug" --ai-infer
 
-但默认必须是本地推断。
+浣嗛粯璁ゅ繀椤绘槸鏈湴鎺ㄦ柇銆?
 
-### V2 验收标准
+### V2 楠屾敹鏍囧噯
 
-对于常见任务能生成合理 scope：
+瀵逛簬甯歌浠诲姟鑳界敓鎴愬悎鐞?scope锛?
 
 - Fix login redirect bug
 - Update navbar style
@@ -570,20 +571,20 @@ agentscope start "Fix login redirect bug" --ai-infer
 
 ---
 
-## V3：Evidence + Policy Gate 成熟版
+## V3锛欵vidence + Policy Gate 鎴愮啛鐗?
 
-### 目标
+### 鐩爣
 
-让 AgentScope 进入工程流程。
+璁?AgentScope 杩涘叆宸ョ▼娴佺▼銆?
 
-V3 的核心：
+V3 鐨勬牳蹇冿細
 
-Evidence Package 成为机器可验证的审计产物。
-Policy Gate 成为 CI 的判断依据。
+Evidence Package 鎴愪负鏈哄櫒鍙獙璇佺殑瀹¤浜х墿銆?
+Policy Gate 鎴愪负 CI 鐨勫垽鏂緷鎹€?
 
-### 必须实现
+### 蹇呴』瀹炵幇
 
-1. Evidence schema 稳定化
+1. Evidence schema 绋冲畾鍖?
 2. scope_hash
 3. diff_hash
 4. transcript_hash
@@ -592,15 +593,15 @@ Policy Gate 成为 CI 的判断依据。
 7. GitHub Action
 8. PR Check Summary
 9. Policy Gate Rules
-10. SARIF 输出可选
+10. SARIF 杈撳嚭鍙€?
 
 ### Evidence Schema
 
-文件：
+鏂囦欢锛?
 
 agentscope-evidence.schema.json
 
-字段：
+瀛楁锛?
 
 {
   "version": "1.0",
@@ -620,23 +621,23 @@ agentscope-evidence.schema.json
 
 scope_hash:
 
-证明 session 使用的是哪份 scope。
+璇佹槑 session 浣跨敤鐨勬槸鍝唤 scope銆?
 
 diff_hash:
 
-证明 evidence 对应的是当前 diff。
+璇佹槑 evidence 瀵瑰簲鐨勬槸褰撳墠 diff銆?
 
 transcript_hash:
 
-证明 evidence 对应某个真实 agent session。
+璇佹槑 evidence 瀵瑰簲鏌愪釜鐪熷疄 agent session銆?
 
 evidence_hash:
 
-证明 evidence 本身未被篡改。
+璇佹槑 evidence 鏈韩鏈绡℃敼銆?
 
 ### Test Evidence
 
-记录：
+璁板綍锛?
 
 {
   "tests": [
@@ -650,26 +651,31 @@ evidence_hash:
   ]
 }
 
-### GitHub Action
+### V3.2 Current Boundary
 
-用法：
+V3 is split into narrow CI phases:
 
-- uses: yourname/agentscope-action@v1
+- V3.0: local `agentscope gate`
+- V3.1: direct GitHub Actions workflow template
+- V3.2: repo-local reusable `action.yml`
+- V3.3: planned SARIF / PR comments / CI report polish
 
-功能：
+Current repo-local action usage:
 
-- 读取 evidence.json
-- 重新计算 diff_hash
-- 检查 scope adherence
-- 检查 blocked_paths
-- 检查 high_risk changes
-- 检查 test evidence
-- 计算 risk score
-- 输出 PR summary
+```yaml
+- name: Run AgentScope Gate
+  uses: ./
+  with:
+    package-manager: pnpm
+```
+
+The action is a thin wrapper. It runs `agentscope gate --json`, writes `.agentscope/ci/gate-result.json`, exposes `status`, `score`, `level`, and `result-path`, then exits with the gate command's exit code.
+
+V3.2 does not implement Marketplace Action publishing, SARIF, PR comments, GitHub API calls, file content inspection, or command output capture.
 
 ### Policy Gate Rules
 
-配置：
+閰嶇疆锛?
 
 policy_gate:
   fail_on:
@@ -686,52 +692,52 @@ policy_gate:
   thresholds:
     max_risk_score: 70
 
-### PR 输出
+### PR 杈撳嚭
 
 AgentScope Policy Gate
 
 Risk: 37/100 Medium
 
-✅ Scope Adherence
-✅ No protected files modified
-✅ Tests verified
-⚠ package.json changed
-⚠ One blocked action occurred
+鉁?Scope Adherence
+鉁?No protected files modified
+鉁?Tests verified
+鈿?package.json changed
+鈿?One blocked action occurred
 
-### V3 验收标准
+### V3 楠屾敹鏍囧噯
 
-在 GitHub PR 中显示 AgentScope check。
+鍦?GitHub PR 涓樉绀?AgentScope check銆?
 
-CI 能验证：
+CI 鑳介獙璇侊細
 
-- evidence.json 是否存在
-- diff_hash 是否匹配
-- scope_hash 是否存在
-- 是否修改 blocked paths
-- risk score 是否超过阈值
+- evidence.json 鏄惁瀛樺湪
+- diff_hash 鏄惁鍖归厤
+- scope_hash 鏄惁瀛樺湪
+- 鏄惁淇敼 blocked paths
+- risk score 鏄惁瓒呰繃闃堝€?
 
 ---
 
-## V4：Team Policy Registry
+## V4锛歍eam Policy Registry
 
-### 目标
+### 鐩爣
 
-让 AgentScope 从个人工具升级为团队工具。
+璁?AgentScope 浠庝釜浜哄伐鍏峰崌绾т负鍥㈤槦宸ュ叿銆?
 
-V4 解决：
+V4 瑙ｅ喅锛?
 
-不同团队、不同任务类型需要可复用 policy 模板。
+涓嶅悓鍥㈤槦銆佷笉鍚屼换鍔＄被鍨嬮渶瑕佸彲澶嶇敤 policy 妯℃澘銆?
 
-### 必须实现
+### 蹇呴』瀹炵幇
 
 1. Policy Templates
 2. Team Registry
 3. Policy Inheritance
-4. CODEOWNERS 集成
+4. CODEOWNERS 闆嗘垚
 5. Organization Defaults
 6. Policy Doctor
 
-### 内置模板
+### 鍐呯疆妯℃澘
 
 - docs-only
 - frontend-bugfix
@@ -746,7 +752,7 @@ V4 解决：
 
 ### Team Registry
 
-路径：
+璺緞锛?
 
 .agentscope/policies/
   frontend-bugfix.yaml
@@ -754,13 +760,13 @@ V4 解决：
   migration.yaml
   security-fix.yaml
 
-命令：
+鍛戒护锛?
 
 agentscope start --template frontend-bugfix "Fix navbar dropdown"
 
 ### Policy Inheritance
 
-支持：
+鏀寔锛?
 
 extends: base
 
@@ -770,7 +776,7 @@ allowed_paths:
 blocked_paths:
   - migrations/**
 
-base policy：
+base policy锛?
 
 base:
   blocked_paths:
@@ -780,28 +786,28 @@ base:
     - rm -rf *
     - curl * | sh
 
-### CODEOWNERS 集成
+### CODEOWNERS 闆嗘垚
 
-如果修改高敏路径：
+濡傛灉淇敼楂樻晱璺緞锛?
 
 - payments/**
 - infra/**
 - security/**
 - .github/**
 
-则：
+鍒欙細
 
-- 增加 risk score
-- 要求 owner review
-- 或进入 warn / fail
+- 澧炲姞 risk score
+- 瑕佹眰 owner review
+- 鎴栬繘鍏?warn / fail
 
 ### Organization Defaults
 
-支持：
+鏀寔锛?
 
 .agentscope/org-policy.yaml
 
-示例：
+绀轰緥锛?
 
 global_blocked_paths:
   - .env*
@@ -815,49 +821,49 @@ global_dangerous_commands:
 
 ### Policy Doctor
 
-命令：
+鍛戒护锛?
 
 agentscope policy doctor
 
-检查：
+妫€鏌ワ細
 
-- policy 是否冲突
-- allowed_paths 是否覆盖 blocked_paths
-- required_commands 是否存在
-- 模板是否引用不存在路径
-- risk rules 是否重复
-- policy inheritance 是否循环
+- policy 鏄惁鍐茬獊
+- allowed_paths 鏄惁瑕嗙洊 blocked_paths
+- required_commands 鏄惁瀛樺湪
+- 妯℃澘鏄惁寮曠敤涓嶅瓨鍦ㄨ矾寰?
+- risk rules 鏄惁閲嶅
+- policy inheritance 鏄惁寰幆
 
-### V4 验收标准
+### V4 楠屾敹鏍囧噯
 
-团队可以维护 `.agentscope/policies/`。
+鍥㈤槦鍙互缁存姢 `.agentscope/policies/`銆?
 
-开发者可以运行：
+寮€鍙戣€呭彲浠ヨ繍琛岋細
 
 agentscope start --template backend-bugfix "Fix webhook retry"
 
-CI 使用同一套 policy gate。
+CI 浣跨敤鍚屼竴濂?policy gate銆?
 
 ---
 
-## V5：Multi-Agent Governance
+## V5锛歁ulti-Agent Governance
 
-### 目标
+### 鐩爣
 
-从 Claude Code 专属升级为多 agent 统一治理层。
+浠?Claude Code 涓撳睘鍗囩骇涓哄 agent 缁熶竴娌荤悊灞傘€?
 
-AgentScope 长期定位不是 Claude Code Extension，而是：
+AgentScope 闀挎湡瀹氫綅涓嶆槸 Claude Code Extension锛岃€屾槸锛?
 
 Open Policy + Evidence Layer for AI Coding Agents
 
-### 必须实现
+### 蹇呴』瀹炵幇
 
 1. Agent Adapter Interface
 2. Unified Tool Event Model
 3. Adapter Capability Matrix
 4. Evidence Import
-5. 多 agent check
-6. MCP 作为 tool source 处理
+5. 澶?agent check
+6. MCP 浣滀负 tool source 澶勭悊
 
 ### Agent Adapter Interface
 
@@ -869,7 +875,7 @@ interface AgentAdapter {
   uninstall(): Promise<void>
 }
 
-支持方向：
+鏀寔鏂瑰悜锛?
 
 - claude-code
 - codex
@@ -879,7 +885,7 @@ interface AgentAdapter {
 
 ### Unified Tool Event Model
 
-统一事件：
+缁熶竴浜嬩欢锛?
 
 {
   "agent": "claude-code",
@@ -892,18 +898,18 @@ interface AgentAdapter {
   "timestamp": "..."
 }
 
-MCP 工具：
+MCP 宸ュ叿锛?
 
 {
   "tool_source": "mcp",
   "tool_name": "github.create_pr"
 }
 
-MCP 不作为产品核心，只作为 tool source。
+MCP 涓嶄綔涓轰骇鍝佹牳蹇冿紝鍙綔涓?tool source銆?
 
 ### Adapter Capability Matrix
 
-不同 agent 支持程度不同：
+涓嶅悓 agent 鏀寔绋嬪害涓嶅悓锛?
 
 Claude Code:
 - enforcement: full
@@ -923,61 +929,61 @@ Custom:
 - enforcement: none
 - evidence: import-only
 
-AgentScope 要诚实显示能力矩阵。
+AgentScope 瑕佽瘹瀹炴樉绀鸿兘鍔涚煩闃点€?
 
 ### Evidence Import
 
-允许导入其他 agent 日志：
+鍏佽瀵煎叆鍏朵粬 agent 鏃ュ織锛?
 
 agentscope import --agent custom ./agent-log.json
 
-然后仍然可以：
+鐒跺悗浠嶇劧鍙互锛?
 
 agentscope check
 agentscope risk
 
-### V5 验收标准
+### V5 楠屾敹鏍囧噯
 
-AgentScope Core 与 Claude Code 解耦。
+AgentScope Core 涓?Claude Code 瑙ｈ€︺€?
 
-Claude Code 仍是最佳支持，但核心抽象已经支持多 agent。
+Claude Code 浠嶆槸鏈€浣虫敮鎸侊紝浣嗘牳蹇冩娊璞″凡缁忔敮鎸佸 agent銆?
 
 ---
 
-## V6：Enterprise Governance
+## V6锛欵nterprise Governance
 
-### 目标
+### 鐩爣
 
-让 AgentScope 具备企业级治理能力。
+璁?AgentScope 鍏峰浼佷笟绾ф不鐞嗚兘鍔涖€?
 
-V6 不是早期目标，但架构要预留扩展空间。
+V6 涓嶆槸鏃╂湡鐩爣锛屼絾鏋舵瀯瑕侀鐣欐墿灞曠┖闂淬€?
 
-### 可能功能
+### 鍙兘鍔熻兘
 
 1. Central Policy Server
 2. Signed Evidence Package
-3. OPA / Rego 集成
-4. SIEM / Audit Log 集成
+3. OPA / Rego 闆嗘垚
+4. SIEM / Audit Log 闆嗘垚
 5. Dashboard
 6. Organization Risk Analytics
 
 ### Central Policy Server
 
-命令：
+鍛戒护锛?
 
 agentscope server
 
-功能：
+鍔熻兘锛?
 
-- policy 分发
-- evidence 收集
+- policy 鍒嗗彂
+- evidence 鏀堕泦
 - risk dashboard
 - team audit
-- session 查询
+- session 鏌ヨ
 
 ### Signed Evidence Package
 
-对 evidence 签名：
+瀵?evidence 绛惧悕锛?
 
 - scope_hash
 - diff_hash
@@ -985,13 +991,13 @@ agentscope server
 - evidence_hash
 - signature
 
-目标：
+鐩爣锛?
 
-防止事后篡改 evidence。
+闃叉浜嬪悗绡℃敼 evidence銆?
 
-### OPA / Rego 集成
+### OPA / Rego 闆嗘垚
 
-支持企业策略：
+鏀寔浼佷笟绛栫暐锛?
 
 deny[msg] {
   input.diff.modified_paths[_] == ".github/workflows/deploy.yml"
@@ -999,9 +1005,9 @@ deny[msg] {
   msg := "CI workflow modified outside ci-change task"
 }
 
-### SIEM / Audit Log 集成
+### SIEM / Audit Log 闆嗘垚
 
-输出到：
+杈撳嚭鍒帮細
 
 - Datadog
 - Splunk
@@ -1011,10 +1017,10 @@ deny[msg] {
 
 ### Dashboard
 
-展示：
+灞曠ず锛?
 
-- AI sessions 数量
-- blocked actions 数量
+- AI sessions 鏁伴噺
+- blocked actions 鏁伴噺
 - high risk PRs
 - risk trends
 - repo risk ranking
@@ -1023,9 +1029,9 @@ deny[msg] {
 
 ### Organization Risk Analytics
 
-示例：
+绀轰緥锛?
 
-过去 30 天：
+杩囧幓 30 澶╋細
 
 - Claude Code sessions: 420
 - High risk PRs: 19
@@ -1033,11 +1039,11 @@ deny[msg] {
 - Missing tests: 82
 - Most common violation: package.json changed outside dependency-update
 
-## 实际开发顺序建议
+## 瀹為檯寮€鍙戦『搴忓缓璁?
 
-### 第 1 周
+### 绗?1 鍛?
 
-完成 V0：
+瀹屾垚 V0锛?
 
 - CLI
 - config
@@ -1045,9 +1051,9 @@ deny[msg] {
 - basic repo scanner
 - basic diff check
 
-### 第 2-3 周
+### 绗?2-3 鍛?
 
-完成 V1：
+瀹屾垚 V1锛?
 
 - Claude Code adapter
 - PreToolUse hook
@@ -1057,9 +1063,9 @@ deny[msg] {
 - risk score
 - markdown report
 
-### 第 4-5 周
+### 绗?4-5 鍛?
 
-完成 V2：
+瀹屾垚 V2锛?
 
 - repo profile
 - task keyword matching
@@ -1068,9 +1074,9 @@ deny[msg] {
 - confidence score
 - rationale
 
-### 第 6 周
+### 绗?6 鍛?
 
-完成 V3：
+瀹屾垚 V3锛?
 
 - evidence schema
 - diff_hash
@@ -1079,22 +1085,22 @@ deny[msg] {
 - PR comment
 - risk threshold
 
-### 第 7-8 周
+### 绗?7-8 鍛?
 
-完成 V4：
+瀹屾垚 V4锛?
 
 - policy templates
 - policy inheritance
 - team registry
 - policy doctor
 
-## 功能优先级
+## 鍔熻兘浼樺厛绾?
 
-最高优先级：
+鏈€楂樹紭鍏堢骇锛?
 
 1. agentscope start
 2. Task Scope Contract
-3. Scope Auto Inference 初版
+3. Scope Auto Inference 鍒濈増
 4. Human Approval
 5. Claude Code Adapter
 6. Runtime Policy Enforcement
@@ -1103,17 +1109,17 @@ deny[msg] {
 9. Policy Gate
 10. Team Policy Registry
 
-## 早期不要做
+## 鏃╂湡涓嶈鍋?
 
-不要在 V0-V2 做：
+涓嶈鍦?V0-V2 鍋氾細
 
 - Web dashboard
-- 多 agent 完整支持
-- MCP 专项管理
+- 澶?agent 瀹屾暣鏀寔
+- MCP 涓撻」绠＄悊
 - LLM-as-judge
-- 云端 policy server
-- 复杂安全扫描
-- 复杂 AST 分析
-- IDE 插件
-- 企业 SSO
-- 可视化 session replay
+- 浜戠 policy server
+- 澶嶆潅瀹夊叏鎵弿
+- 澶嶆潅 AST 鍒嗘瀽
+- IDE 鎻掍欢
+- 浼佷笟 SSO
+- 鍙鍖?session replay

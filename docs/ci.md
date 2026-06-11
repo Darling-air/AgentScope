@@ -1,10 +1,10 @@
-# AgentScope CI Workflow Template
+# AgentScope CI
 
-V3.1 makes `agentscope gate` easy to run in GitHub Actions. It is a workflow template, not a Marketplace Action.
+V3.2 supports two GitHub Actions integration styles: a direct workflow template and a repo-local reusable action. Both are thin wrappers around `agentscope gate`; neither is a Marketplace Action.
 
 ## How CI Gate Works
 
-The workflow does three things:
+The direct workflow does three things:
 
 1. Install the project dependencies.
 2. Run `agentscope gate --json`.
@@ -29,6 +29,8 @@ Options:
 
 ```bash
 agentscope ci init github-actions --force
+agentscope ci init github-actions --mode direct
+agentscope ci init github-actions --mode action
 agentscope ci init github-actions --package-manager pnpm
 agentscope ci init github-actions --package-manager npm
 agentscope ci init github-actions --allow-missing-evidence
@@ -36,7 +38,17 @@ agentscope ci init github-actions --allow-missing-evidence
 
 The command writes `.github/workflows/agentscope-gate.yml`. It does not run `git add`, commit changes, call GitHub APIs, or modify `.agentscope/config.yaml`.
 
-## pnpm Workflow
+## Direct Workflow
+
+Direct mode is the default:
+
+```bash
+agentscope ci init github-actions --mode direct
+```
+
+It runs `agentscope gate --json` directly.
+
+### pnpm
 
 ```yaml
 - name: Install dependencies
@@ -55,7 +67,7 @@ The command writes `.github/workflows/agentscope-gate.yml`. It does not run `git
     exit $code
 ```
 
-## npm Workflow
+### npm
 
 ```yaml
 - name: Install dependencies
@@ -72,6 +84,67 @@ The command writes `.github/workflows/agentscope-gate.yml`. It does not run `git
     cat .agentscope/ci/gate-result.json
     exit $code
 ```
+
+## Repo-local Reusable Action
+
+Action mode generates a workflow that uses this repository's root `action.yml`:
+
+```bash
+agentscope ci init github-actions --mode action
+```
+
+The generated gate step is:
+
+```yaml
+- name: Run AgentScope Gate
+  uses: ./
+  with:
+    package-manager: pnpm
+```
+
+For npm:
+
+```bash
+agentscope ci init github-actions --mode action --package-manager npm
+```
+
+```yaml
+with:
+  package-manager: npm
+```
+
+For missing-evidence rollout:
+
+```bash
+agentscope ci init github-actions --mode action --allow-missing-evidence
+```
+
+```yaml
+with:
+  package-manager: pnpm
+  allow-missing-evidence: true
+```
+
+The repo-local action can also be used manually:
+
+```yaml
+- name: Run AgentScope Gate
+  uses: ./
+  with:
+    package-manager: pnpm
+    allow-missing-evidence: false
+```
+
+Action outputs:
+
+- `status`
+- `score`
+- `level`
+- `result-path`
+
+The action creates `.agentscope/ci`, runs `agentscope gate --json`, writes `.agentscope/ci/gate-result.json`, parses outputs from that JSON, and finally exits with the gate command's exit code. It does not copy threshold, factor, policy, risk, evidence, hook, or scope-history logic.
+
+Future Marketplace Action usage is planned but not implemented yet.
 
 ## Missing Evidence
 
@@ -109,16 +182,16 @@ Doctor checks for:
 - `.agentscope/config.yaml`
 - `.agentscope/evidence/latest.json`
 - `.github/workflows/agentscope-gate.yml`
+- `action.yml`
 - `package.json`
 
-Missing diagnostic items do not cause exit `1`; doctor is not a gate.
+Missing diagnostic items do not cause exit `1`; doctor is not a gate. If a workflow contains `uses: ./` but `action.yml` is missing, doctor recommends adding the repo-local action.
 
 ## Current Limits
 
-V3.1 does not implement:
+V3.2 does not implement:
 
 - Marketplace Action
-- reusable GitHub Action
 - SARIF
 - PR comment
 - JUnit output

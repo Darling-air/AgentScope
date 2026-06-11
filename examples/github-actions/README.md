@@ -1,6 +1,10 @@
-# AgentScope GitHub Actions Workflow Example
+# AgentScope GitHub Actions Examples
 
-This directory contains a copyable GitHub Actions workflow that runs:
+This directory contains copyable GitHub Actions examples for AgentScope.
+
+## Direct Workflow
+
+`agentscope-gate.yml` runs:
 
 ```bash
 agentscope gate --json
@@ -20,8 +24,36 @@ cp examples/github-actions/agentscope-gate.yml .github/workflows/agentscope-gate
 Or generate it:
 
 ```bash
-agentscope ci init github-actions
+agentscope ci init github-actions --mode direct
 ```
+
+Direct mode is the default.
+
+## Repo-local Action Workflow
+
+`agentscope-action.yml` uses the root `action.yml` as a repo-local reusable action:
+
+```yaml
+- name: Run AgentScope Gate
+  uses: ./
+  with:
+    package-manager: pnpm
+```
+
+Generate this workflow with:
+
+```bash
+agentscope ci init github-actions --mode action
+```
+
+This is a repo-local action example, not a Marketplace Action.
+
+The action outputs:
+
+- `status`
+- `score`
+- `level`
+- `result-path`
 
 ## pnpm vs npm
 
@@ -70,4 +102,4 @@ It also prints that JSON to the job log. Uploading it as an artifact is optional
 
 ## Current Limits
 
-This is not a Marketplace Action or reusable GitHub Action. V3.1 does not implement SARIF, PR comments, JUnit output, GitHub API calls, branch protection integration, or remote/team policy.
+V3.2 does not implement Marketplace publishing, SARIF, PR comments, JUnit output, GitHub API calls, branch protection integration, or remote/team policy.

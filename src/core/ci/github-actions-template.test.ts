@@ -48,4 +48,40 @@ describe("githubActionsWorkflowTemplate", () => {
     expect(workflow).not.toContain("blocked_path_denied");
     expect(workflow).not.toContain("risk_score_exceeded");
   });
+
+  it("generated action-mode workflow uses ./", () => {
+    const workflow = githubActionsWorkflowTemplate({ mode: "action" });
+    expect(workflow).toContain("uses: ./");
+  });
+
+  it("generated action-mode workflow passes package-manager", () => {
+    const workflow = githubActionsWorkflowTemplate({
+      mode: "action",
+      packageManager: "pnpm",
+    });
+    expect(workflow).toContain("package-manager: pnpm");
+  });
+
+  it("direct mode workflow remains unchanged", () => {
+    const workflow = githubActionsWorkflowTemplate({ mode: "direct" });
+    expect(workflow).toContain("pnpm exec agentscope gate --json > .agentscope/ci/gate-result.json");
+    expect(workflow).not.toContain("uses: ./");
+  });
+
+  it("allow-missing-evidence works in action mode", () => {
+    const workflow = githubActionsWorkflowTemplate({
+      mode: "action",
+      allowMissingEvidence: true,
+    });
+    expect(workflow).toContain("allow-missing-evidence: true");
+  });
+
+  it("npm package manager works in action mode", () => {
+    const workflow = githubActionsWorkflowTemplate({
+      mode: "action",
+      packageManager: "npm",
+    });
+    expect(workflow).toContain("npm ci");
+    expect(workflow).toContain("package-manager: npm");
+  });
 });

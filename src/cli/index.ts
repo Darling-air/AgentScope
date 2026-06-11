@@ -178,6 +178,7 @@ ciInit
   .option("--force", "Overwrite an existing workflow")
   .option("--allow-missing-evidence", "Run gate with --allow-missing-evidence")
   .option("--package-manager <manager>", "Package manager: pnpm or npm", "pnpm")
+  .option("--mode <mode>", "Workflow mode: direct or action", "direct")
   .action((options: Parameters<typeof ciInitGithubActionsCommand>[0]) => {
     ciInitGithubActionsCommand(options);
   });

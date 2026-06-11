@@ -1,11 +1,13 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { getProjectPaths } from "../../core/fs/project-paths.js";
 import {
   GITHUB_ACTIONS_WORKFLOW_PATH,
   githubActionsWorkflowTemplate,
+  isGithubActionsTemplateMode,
   isCiPackageManager,
   type CiPackageManager,
+  type GithubActionsTemplateMode,
 } from "../../core/ci/index.js";
 import { color } from "../ui.js";
 
@@ -13,6 +15,7 @@ export interface CiInitGithubActionsOptions {
   force?: boolean;
   allowMissingEvidence?: boolean;
   packageManager?: string;
+  mode?: string;
 }
 
 export interface CiDoctorOptions {
@@ -30,6 +33,7 @@ interface CiDoctorResult {
   config: DiagnosticItem;
   evidence: DiagnosticItem;
   workflow: DiagnosticItem;
+  action: DiagnosticItem;
   package: DiagnosticItem;
   recommendations: string[];
 }
@@ -43,6 +47,14 @@ export function ciInitGithubActionsCommand(
       color.red(
         `Invalid package manager "${packageManager}". Expected "pnpm" or "npm".`,
       ),
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const mode = options.mode ?? "direct";
+  if (!isGithubActionsTemplateMode(mode)) {
+    console.error(
+      color.red(`Invalid CI mode "${mode}". Expected "direct" or "action".`),
     );
     process.exitCode = 1;
     return;
@@ -67,6 +79,7 @@ export function ciInitGithubActionsCommand(
     githubActionsWorkflowTemplate({
       packageManager: packageManager as CiPackageManager,
       allowMissingEvidence: options.allowMissingEvidence ?? false,
+      mode: mode as GithubActionsTemplateMode,
     }),
     "utf8",
   );
@@ -97,6 +110,7 @@ export function ciDoctorCommand(options: CiDoctorOptions = {}): void {
   printDiagnostic("Config", result.config);
   printDiagnostic("Evidence", result.evidence);
   printDiagnostic("Workflow", result.workflow);
+  printDiagnostic("Action", result.action);
   printDiagnostic("Package", result.package);
   console.log("");
   console.log(color.cyan("Recommendation:"));
@@ -114,12 +128,14 @@ export function ciDoctorCommand(options: CiDoctorOptions = {}): void {
 function buildDoctorResult(): CiDoctorResult {
   const paths = getProjectPaths();
   const workflowPath = path.join(paths.root, GITHUB_ACTIONS_WORKFLOW_PATH);
+  const actionPath = path.join(paths.root, "action.yml");
   const packagePath = path.join(paths.root, "package.json");
 
   const result: CiDoctorResult = {
     config: item(paths.configFile),
     evidence: item(paths.evidenceLatestFile),
     workflow: item(workflowPath),
+    action: item(actionPath),
     package: item(packagePath),
     recommendations: [],
   };
@@ -138,8 +154,25 @@ function buildDoctorResult(): CiDoctorResult {
   if (result.package.status === "missing") {
     result.recommendations.push("Run from a Node project with package.json.");
   }
+  if (
+    result.workflow.status === "found" &&
+    result.action.status === "missing" &&
+    workflowUsesLocalAction(workflowPath)
+  ) {
+    result.recommendations.push(
+      "Workflow appears to use the local AgentScope action, but action.yml is missing.",
+    );
+  }
 
   return result;
+}
+
+function workflowUsesLocalAction(workflowPath: string): boolean {
+  try {
+    return readFileSync(workflowPath, "utf8").includes("uses: ./");
+  } catch {
+    return false;
+  }
 }
 
 function item(filePath: string): DiagnosticItem {
