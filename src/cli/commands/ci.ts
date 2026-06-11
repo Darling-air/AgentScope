@@ -16,6 +16,7 @@ export interface CiInitGithubActionsOptions {
   allowMissingEvidence?: boolean;
   packageManager?: string;
   mode?: string;
+  summary?: string;
 }
 
 export interface CiDoctorOptions {
@@ -80,6 +81,7 @@ export function ciInitGithubActionsCommand(
       packageManager: packageManager as CiPackageManager,
       allowMissingEvidence: options.allowMissingEvidence ?? false,
       mode: mode as GithubActionsTemplateMode,
+      summaryPath: options.summary,
     }),
     "utf8",
   );

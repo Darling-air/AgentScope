@@ -84,4 +84,49 @@ describe("githubActionsWorkflowTemplate", () => {
     expect(workflow).toContain("npm ci");
     expect(workflow).toContain("package-manager: npm");
   });
+
+  it("direct mode adds a ci-summary step when summaryPath is set", () => {
+    const workflow = githubActionsWorkflowTemplate({
+      packageManager: "pnpm",
+      summaryPath: ".agentscope/ci/summary.md",
+    });
+    expect(workflow).toContain(
+      "pnpm exec agentscope ci-summary --output .agentscope/ci/summary.md",
+    );
+  });
+
+  it("direct mode npm uses npx for the ci-summary step", () => {
+    const workflow = githubActionsWorkflowTemplate({
+      packageManager: "npm",
+      summaryPath: ".agentscope/ci/summary.md",
+    });
+    expect(workflow).toContain(
+      "npx agentscope ci-summary --output .agentscope/ci/summary.md",
+    );
+  });
+
+  it("omits the ci-summary step when no summaryPath is set", () => {
+    const workflow = githubActionsWorkflowTemplate({ packageManager: "pnpm" });
+    expect(workflow).not.toContain("ci-summary");
+  });
+
+  it("action mode passes summary-path input when summaryPath is set", () => {
+    const workflow = githubActionsWorkflowTemplate({
+      mode: "action",
+      summaryPath: ".agentscope/ci/summary.md",
+    });
+    expect(workflow).toContain("summary-path: .agentscope/ci/summary.md");
+  });
+
+  it("summary step does not affect the gate exit code", () => {
+    const workflow = githubActionsWorkflowTemplate({
+      packageManager: "pnpm",
+      summaryPath: ".agentscope/ci/summary.md",
+    });
+    // The gate step still owns the exit code; the summary step is additive.
+    expect(workflow).toContain(
+      "pnpm exec agentscope gate --json > .agentscope/ci/gate-result.json",
+    );
+    expect(workflow).toContain("exit $code");
+  });
 });

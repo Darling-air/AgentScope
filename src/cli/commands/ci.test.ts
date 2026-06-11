@@ -262,6 +262,31 @@ describe("ci init github-actions", () => {
     expect(workflow).toContain("package-manager: npm");
   });
 
+  it("--summary adds a ci-summary step in direct mode", () => {
+    const dir = makeProject();
+    process.chdir(dir);
+
+    ciInitGithubActionsCommand({ summary: ".agentscope/ci/summary.md" });
+
+    const workflow = readFileSync(workflowPath(dir), "utf8");
+    expect(workflow).toContain(
+      "agentscope ci-summary --output .agentscope/ci/summary.md",
+    );
+  });
+
+  it("--summary passes summary-path input in action mode", () => {
+    const dir = makeProject();
+    process.chdir(dir);
+
+    ciInitGithubActionsCommand({
+      mode: "action",
+      summary: ".agentscope/ci/summary.md",
+    });
+
+    const workflow = readFileSync(workflowPath(dir), "utf8");
+    expect(workflow).toContain("summary-path: .agentscope/ci/summary.md");
+  });
+
   it("invalid package manager errors clearly", () => {
     const dir = makeProject();
     process.chdir(dir);

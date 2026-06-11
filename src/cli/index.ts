@@ -14,6 +14,10 @@ import { reportCommand } from "./commands/report.js";
 import { riskCommand } from "./commands/risk.js";
 import { gateCommand, type GateCommandOptions } from "./commands/gate.js";
 import {
+  ciSummaryCommand,
+  type CiSummaryCommandOptions,
+} from "./commands/ci-summary.js";
+import {
   ciDoctorCommand,
   ciInitGithubActionsCommand,
 } from "./commands/ci.js";
@@ -163,6 +167,16 @@ program
     gateCommand(options);
   });
 
+// `agentscope ci-summary [--json] [--output <file>]`
+program
+  .command("ci-summary")
+  .description("Generate a human-readable CI summary from evidence and risk")
+  .option("--json", "Print the summary JSON after writing Markdown")
+  .option("--output <file>", "Summary Markdown output path")
+  .action((options: CiSummaryCommandOptions) => {
+    ciSummaryCommand(options);
+  });
+
 // `agentscope ci init github-actions` / `agentscope ci doctor`
 const ci = program
   .command("ci")
@@ -179,6 +193,7 @@ ciInit
   .option("--allow-missing-evidence", "Run gate with --allow-missing-evidence")
   .option("--package-manager <manager>", "Package manager: pnpm or npm", "pnpm")
   .option("--mode <mode>", "Workflow mode: direct or action", "direct")
+  .option("--summary <file>", "Generate a CI summary at this path after the gate")
   .action((options: Parameters<typeof ciInitGithubActionsCommand>[0]) => {
     ciInitGithubActionsCommand(options);
   });

@@ -66,4 +66,24 @@ describe("repo-local action.yml", () => {
     expect(raw).not.toContain("gh api");
     expect(raw).not.toContain("GITHUB_TOKEN");
   });
+
+  it("exposes an optional summary-path input", () => {
+    const { parsed } = loadAction();
+    const inputs = parsed.inputs as Record<string, { required?: boolean }>;
+    expect(inputs["summary-path"]).toBeDefined();
+    expect(inputs["summary-path"]?.required).toBe(false);
+  });
+
+  it("generates the CI summary only when summary-path is provided", () => {
+    const { raw } = loadAction();
+    expect(raw).toContain("agentscope ci-summary --output");
+    expect(raw).toContain("inputs.summary-path != ''");
+  });
+
+  it("summary generation never fails the job", () => {
+    const { raw } = loadAction();
+    // The summary command tolerates failure; the gate exit code is enforced separately.
+    expect(raw).toContain("|| true");
+    expect(raw).toContain('exit "${{ steps.run-gate.outputs.gate-exit-code }}"');
+  });
 });

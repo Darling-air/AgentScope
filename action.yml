@@ -22,6 +22,10 @@ inputs:
     description: "Override the AgentScope gate command."
     required: false
     default: ""
+  summary-path:
+    description: "Optional path for a generated AgentScope CI summary Markdown file."
+    required: false
+    default: ""
 
 outputs:
   status:
@@ -100,6 +104,19 @@ runs:
         console.log(`score=${score}`);
         console.log(`level=${level}`);
         NODE
+
+    - name: Generate CI summary
+      if: ${{ inputs.summary-path != '' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ "${{ inputs.package-manager }}" = "npm" ]; then
+          SUMMARY_COMMAND="npx agentscope ci-summary --output ${{ inputs.summary-path }}"
+        else
+          SUMMARY_COMMAND="pnpm exec agentscope ci-summary --output ${{ inputs.summary-path }}"
+        fi
+
+        eval "$SUMMARY_COMMAND" || true
 
     - name: Enforce gate result
       shell: bash

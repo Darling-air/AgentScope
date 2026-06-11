@@ -5,6 +5,7 @@ export interface GithubActionsTemplateOptions {
   packageManager?: CiPackageManager;
   allowMissingEvidence?: boolean;
   mode?: GithubActionsTemplateMode;
+  summaryPath?: string;
 }
 
 export const GITHUB_ACTIONS_WORKFLOW_PATH =
@@ -30,6 +31,7 @@ export function githubActionsWorkflowTemplate(
   }
 
   const allowMissing = options.allowMissingEvidence ?? false;
+  const summaryPath = options.summaryPath;
   const installCommand =
     packageManager === "pnpm"
       ? "corepack enable\n          pnpm install --frozen-lockfile"
@@ -38,6 +40,16 @@ export function githubActionsWorkflowTemplate(
     packageManager === "pnpm"
       ? `pnpm exec agentscope gate --json${allowMissing ? " --allow-missing-evidence" : ""}`
       : `npx agentscope gate --json${allowMissing ? " --allow-missing-evidence" : ""}`;
+
+  const summaryStep = summaryPath
+    ? `
+      - name: Generate AgentScope CI summary
+        if: always()
+        shell: bash
+        run: |
+          ${packageManager === "pnpm" ? "pnpm exec" : "npx"} agentscope ci-summary --output ${summaryPath}
+`
+    : "";
 
   return `name: AgentScope Gate
 
@@ -73,6 +85,7 @@ jobs:
           code=$?
           cat .agentscope/ci/gate-result.json
           exit $code
+${summaryStep}
 `;
 }
 
@@ -81,12 +94,16 @@ function githubActionsActionWorkflowTemplate(
 ): string {
   const packageManager = options.packageManager ?? "pnpm";
   const allowMissing = options.allowMissingEvidence ?? false;
+  const summaryPath = options.summaryPath;
   const installCommand =
     packageManager === "pnpm"
       ? "corepack enable\n          pnpm install --frozen-lockfile"
       : "npm ci";
   const allowMissingInput = allowMissing
     ? "          allow-missing-evidence: true\n"
+    : "";
+  const summaryInput = summaryPath
+    ? `          summary-path: ${summaryPath}\n`
     : "";
 
   return `name: AgentScope Gate
@@ -118,5 +135,5 @@ jobs:
         uses: ./
         with:
           package-manager: ${packageManager}
-${allowMissingInput}`;
+${allowMissingInput}${summaryInput}`;
 }
