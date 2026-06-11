@@ -1,16 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { defaultConfig } from "./default-config.js";
+import { defaultConfig, DEFAULT_CONFIG_YAML } from "./default-config.js";
 import { AgentScopeConfigSchema } from "../schema/config.js";
+import { parse as parseYaml } from "yaml";
 
-describe("defaultConfig", () => {
-  it("produces a config that satisfies the schema", () => {
-    const parsed = AgentScopeConfigSchema.safeParse(defaultConfig());
-    expect(parsed.success).toBe(true);
-  });
-
-  it("includes the expected default allowed paths", () => {
+describe("defaultConfig (effective)", () => {
+  it("includes the expected fallback allowed paths", () => {
     const cfg = defaultConfig();
-    expect(cfg.defaults.allowed_paths).toEqual([
+    expect(cfg.inference.fallback.allowed_paths).toEqual([
       "src/**",
       "tests/**",
       "__tests__/**",
@@ -19,18 +15,37 @@ describe("defaultConfig", () => {
 
   it("blocks sensitive and infra paths by default", () => {
     const cfg = defaultConfig();
-    expect(cfg.defaults.blocked_paths).toContain(".env*");
-    expect(cfg.defaults.blocked_paths).toContain(".github/**");
-    expect(cfg.defaults.blocked_paths).toContain("migrations/**");
+    expect(cfg.policy.blocked_paths).toContain(".env*");
+    expect(cfg.policy.blocked_paths).toContain(".github/**");
+    expect(cfg.policy.blocked_paths).toContain("migrations/**");
   });
 
   it("marks lockfiles and package.json as high risk", () => {
     const cfg = defaultConfig();
-    expect(cfg.defaults.high_risk).toContain("package.json");
-    expect(cfg.defaults.high_risk).toContain("pnpm-lock.yaml");
+    expect(cfg.policy.high_risk).toContain("package.json");
+    expect(cfg.policy.high_risk).toContain("pnpm-lock.yaml");
   });
 
-  it("defaults package_manager to auto", () => {
-    expect(defaultConfig().project.package_manager).toBe("auto");
+  it("includes the built-in dangerous commands", () => {
+    const cfg = defaultConfig();
+    expect(cfg.policy.dangerous_commands).toContain("git push --force");
+  });
+
+  it("defaults the inference confidence threshold to 0.65", () => {
+    expect(defaultConfig().inference.confidence_threshold).toBe(0.65);
+  });
+});
+
+describe("DEFAULT_CONFIG_YAML", () => {
+  it("parses and validates against the config schema", () => {
+    const parsed = AgentScopeConfigSchema.safeParse(parseYaml(DEFAULT_CONFIG_YAML));
+    expect(parsed.success).toBe(true);
+  });
+
+  it("uses the V2.1 version + structured shape", () => {
+    const raw = parseYaml(DEFAULT_CONFIG_YAML) as Record<string, unknown>;
+    expect(raw.version).toBe(1);
+    expect(raw).toHaveProperty("policy");
+    expect(raw).toHaveProperty("inference");
   });
 });

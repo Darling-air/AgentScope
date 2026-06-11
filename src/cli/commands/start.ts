@@ -1,13 +1,17 @@
-import { mkdirSync, existsSync } from "node:fs";
-import { getProjectPaths, scopeFileForTask } from "../../core/fs/project-paths.js";
+import { getProjectPaths } from "../../core/fs/project-paths.js";
 import { loadConfig, ConfigError } from "../../core/config/load-config.js";
 import { createScopeWithInference } from "../../core/scope/create-scope.js";
-import { writeScope } from "../../core/scope/scope-io.js";
+import { applyScopeOverride } from "../../core/scope/override.js";
+import { saveScope } from "../../core/scope/history.js";
 import type { ScopeContract } from "../../core/schema/scope-contract.js";
+import {
+  buildOverridePatch,
+  type OverrideFlagValues,
+} from "../override-flags.js";
 import { color, printList } from "../ui.js";
 import { prompt } from "../prompt.js";
 
-export interface StartOptions {
+export interface StartOptions extends OverrideFlagValues {
   /** Show the inferred scope without writing or prompting. */
   dryRun?: boolean;
   /** Emit the inferred scope as parseable JSON (implies no write/prompt). */
@@ -102,7 +106,11 @@ export async function startCommand(
     config,
     createdAt: new Date().toISOString(),
   });
-  const scope = inferred.scope;
+
+  // Apply any user override flags AFTER inference. This adjusts only this scope;
+  // it never touches config.yaml. Override rationale is recorded on the scope.
+  const overrides = buildOverridePatch(options);
+  const scope = applyScopeOverride(inferred.scope, overrides);
 
   // --json: machine-readable output, no write, no prompt.
   if (options.json) {
@@ -113,6 +121,7 @@ export async function startCommand(
           classification: inferred.classification,
           matched_rule_packs: inferred.matchedRulePacks,
           used_fallback: inferred.usedFallback,
+          overrides,
           dry_run: options.dryRun ?? false,
         },
         null,
@@ -168,9 +177,5 @@ function writeScopeFiles(
   paths: ReturnType<typeof getProjectPaths>,
   scope: ScopeContract,
 ): void {
-  if (!existsSync(paths.scopesDir)) {
-    mkdirSync(paths.scopesDir, { recursive: true });
-  }
-  writeScope(paths.currentScopeFile, scope);
-  writeScope(scopeFileForTask(paths, scope.task.id), scope);
+  saveScope(scope, paths);
 }

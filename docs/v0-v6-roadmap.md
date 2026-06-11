@@ -31,15 +31,17 @@ V1.1  ✅ done    Claude Code PreToolUse translator + hook entrypoint
 V1.2  ✅ done    Claude Code hook installer + live runtime enforcement
 V1.3  ✅ done    Evidence Event Recorder
 V1.4  ✅ done    Deterministic Risk Score V1
-V1.5  ▶ current  GitHub-ready demo polish (README / examples / docs / packaging)
-V2    ⏳ planned Scope Auto Inference 深化
+V1.5  ✅ done    GitHub-ready demo polish (README / examples / docs / packaging)
+V2.0  ✅ done    Scope Inference V2 (deterministic classifier + rule packs)
+V2.1  ✅ done    Policy Config Improvements (.agentscope/config.yaml + effective config)
+V2.2  ▶ current  Scope Review / Override UX (scope explain/diff/apply + start override flags)
 V3    ⏳ planned Evidence + Policy Gate + GitHub Action
 V4    ⏳ planned Team Policy Registry
 V5    ⏳ planned Multi-Agent Governance
 V6    ⏳ planned Enterprise Governance
 ```
 
-Policy Gate 和 GitHub Action 仍属于 V3，**尚未实现**。V1.5 不新增治理功能，只做文档、examples、demo、CLI help 和 packaging polish。
+Policy Gate 和 GitHub Action 仍属于 V3，**尚未实现**；Team Policy Registry 属于 V4，**尚未实现**。V2.2 只做 scope review/override UX（`scope explain` / `scope diff` / `scope apply`、`start` 的 override flags、纯函数 `applyScopeOverride` / `diffScopes`），override 只影响单个 active scope、**不修改 config.yaml**、不改变 runtime enforcement 语义。
 
 ## V0：本地原型版
 

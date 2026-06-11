@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { startCommand } from "./start.js";
@@ -86,5 +86,88 @@ describe("start --json", () => {
     const parsed = JSON.parse(output());
     expect(parsed.error).toBe("invalid_task");
     expect(process.exitCode).toBe(1);
+  });
+});
+
+describe("start override flags", () => {
+  it("--dry-run --add-allowed shows patched scope and does not write", async () => {
+    const dir = makeProject();
+    process.chdir(dir);
+    await startCommand("Fix login redirect bug", {
+      dryRun: true,
+      addAllowed: ["app/auth/**"],
+    });
+    const out = output();
+    expect(out).toContain("app/auth/**");
+    expect(out).toContain("Override: added allowed path app/auth/**.");
+    expect(existsSync(getProjectPaths(dir).currentScopeFile)).toBe(false);
+  });
+
+  it("--json includes the patched scope and overrides", async () => {
+    const dir = makeProject();
+    process.chdir(dir);
+    await startCommand("Fix login redirect bug", {
+      json: true,
+      addAllowed: ["app/auth/**"],
+      removeAllowed: ["src/**/login*"],
+      addBlocked: ["private/**"],
+      addHighRisk: ["scripts/release/**"],
+    });
+    const parsed = JSON.parse(output());
+    expect(parsed.scope.allowed_paths).toContain("app/auth/**");
+    expect(parsed.scope.allowed_paths).not.toContain("src/**/login*");
+    expect(parsed.scope.blocked_paths).toContain("private/**");
+    expect(parsed.scope.high_risk).toContain("scripts/release/**");
+    expect(parsed.overrides.allowed_paths.add).toContain("app/auth/**");
+    expect(parsed.overrides.allowed_paths.remove).toContain("src/**/login*");
+    expect(existsSync(getProjectPaths(dir).currentScopeFile)).toBe(false);
+  });
+
+  it("supports repeated --add-allowed", async () => {
+    const dir = makeProject();
+    process.chdir(dir);
+    await startCommand("Fix login redirect bug", {
+      json: true,
+      addAllowed: ["app/auth/**", "lib/auth/**"],
+    });
+    const parsed = JSON.parse(output());
+    expect(parsed.scope.allowed_paths).toContain("app/auth/**");
+    expect(parsed.scope.allowed_paths).toContain("lib/auth/**");
+  });
+
+  it("remove-allowed removes the exact path", async () => {
+    const dir = makeProject();
+    process.chdir(dir);
+    await startCommand("Fix login redirect bug", {
+      json: true,
+      removeAllowed: ["src/auth/**"],
+    });
+    const parsed = JSON.parse(output());
+    expect(parsed.scope.allowed_paths).not.toContain("src/auth/**");
+  });
+
+  it("override rationale appears in the patched scope", async () => {
+    const dir = makeProject();
+    process.chdir(dir);
+    await startCommand("Fix login redirect bug", {
+      json: true,
+      addBlocked: ["private/**"],
+    });
+    const parsed = JSON.parse(output());
+    expect(parsed.scope.rationale).toContain(
+      "Override: added blocked path private/**.",
+    );
+  });
+
+  it("does not modify config.yaml", async () => {
+    const dir = makeProject();
+    process.chdir(dir);
+    const before = readFileSync(getProjectPaths(dir).configFile, "utf8");
+    await startCommand("Fix login redirect bug", {
+      json: true,
+      addAllowed: ["app/auth/**"],
+    });
+    const after = readFileSync(getProjectPaths(dir).configFile, "utf8");
+    expect(after).toBe(before);
   });
 });

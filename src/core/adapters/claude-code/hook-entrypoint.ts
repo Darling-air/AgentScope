@@ -6,7 +6,7 @@ import {
   type ClaudeHookResponse,
 } from "./hook-response.js";
 import { getProjectPaths } from "../../fs/project-paths.js";
-import { loadConfig } from "../../config/load-config.js";
+import { loadConfigResult } from "../../config/load-config.js";
 import { readScope } from "../../scope/scope-io.js";
 import {
   evaluateToolEvent,
@@ -69,13 +69,14 @@ export async function runClaudePreToolUseHook(
     return safeAsk("the active scope file is missing or invalid");
   }
 
-  // 4. Load dangerous commands from config; fall back to defaults on any error.
+  // 4. Load dangerous commands from the effective config; fall back to defaults
+  // on any error. An invalid/unreadable config must never weaken enforcement
+  // or crash the hook, so loadConfigResult never throws and we keep the safe
+  // built-in dangerous-command list when it fails.
   let dangerousCommands = DEFAULT_DANGEROUS_COMMANDS;
-  try {
-    dangerousCommands = loadConfig(paths).defaults.dangerous_commands;
-  } catch {
-    // Keep defaults; an invalid config should not weaken enforcement.
-    dangerousCommands = DEFAULT_DANGEROUS_COMMANDS;
+  const configResult = loadConfigResult(paths);
+  if (configResult.ok) {
+    dangerousCommands = configResult.config.policy.dangerous_commands;
   }
 
   // 5. Translate -> evaluate -> map to a Claude response.

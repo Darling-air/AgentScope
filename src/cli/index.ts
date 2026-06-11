@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { initCommand } from "./commands/init.js";
-import { startCommand } from "./commands/start.js";
+import { startCommand, type StartOptions } from "./commands/start.js";
 import { showCommand } from "./commands/show.js";
 import { checkCommand } from "./commands/check.js";
 import { hookClaudeCodePreToolUseCommand } from "./commands/hook.js";
@@ -12,6 +12,20 @@ import {
 } from "./commands/evidence.js";
 import { reportCommand } from "./commands/report.js";
 import { riskCommand } from "./commands/risk.js";
+import {
+  configShowCommand,
+  configValidateCommand,
+} from "./commands/config.js";
+import {
+  scopeExplainCommand,
+  scopeDiffCommand,
+  scopeApplyCommand,
+} from "./commands/scope.js";
+import {
+  scopeListCommand,
+  scopeUseCommand,
+} from "./commands/scope-history.js";
+import { collect } from "./override-flags.js";
 import { color } from "./ui.js";
 
 const program = new Command();
@@ -34,7 +48,15 @@ program
   .argument("<task>", "natural language task description")
   .option("--dry-run", "Show the inferred scope without writing or prompting")
   .option("--json", "Output the inferred scope as JSON (no write, no prompt)")
-  .action(async (task: string, options: { dryRun?: boolean; json?: boolean }) => {
+  .option("--add-allowed <pattern>", "Add an allowed path (repeatable)", collect, [])
+  .option("--remove-allowed <pattern>", "Remove an allowed path (repeatable)", collect, [])
+  .option("--add-blocked <pattern>", "Add a blocked path (repeatable)", collect, [])
+  .option("--remove-blocked <pattern>", "Remove a blocked path (repeatable)", collect, [])
+  .option("--add-high-risk <pattern>", "Add a high-risk path (repeatable)", collect, [])
+  .option("--remove-high-risk <pattern>", "Remove a high-risk path (repeatable)", collect, [])
+  .option("--add-command <command>", "Add an allowed command (repeatable)", collect, [])
+  .option("--remove-command <command>", "Remove an allowed command (repeatable)", collect, [])
+  .action(async (task: string, options: StartOptions) => {
     await startCommand(task, options);
   });
 
@@ -133,6 +155,82 @@ program
   .option("--json", "Print the full RiskScoreV1 JSON instead of a summary")
   .action((options: { json?: boolean }) => {
     riskCommand(options);
+  });
+
+// `agentscope config show|validate`
+const config = program
+  .command("config")
+  .description("Inspect or validate the effective project config");
+
+config
+  .command("show")
+  .description("Show the normalized effective config")
+  .option("--json", "Print the effective config as JSON")
+  .action((options: { json?: boolean }) => {
+    configShowCommand(options);
+  });
+
+config
+  .command("validate")
+  .description("Validate .agentscope/config.yaml")
+  .action(() => {
+    configValidateCommand();
+  });
+
+// `agentscope scope explain|list|use|diff|apply`
+const scope = program
+  .command("scope")
+  .description("Review, restore, diff, and override Task Scope Contracts");
+
+scope
+  .command("explain")
+  .description("Explain the active scope (paths, commands, rationale)")
+  .option("--json", "Output the active scope as JSON")
+  .action((options: { json?: boolean }) => {
+    scopeExplainCommand(options);
+  });
+
+scope
+  .command("list")
+  .description("List saved historical task scopes")
+  .option("--json", "Output saved scopes as JSON")
+  .action((options: { json?: boolean }) => {
+    scopeListCommand(options);
+  });
+
+scope
+  .command("use")
+  .description("Restore a historical task scope to current-scope.yaml")
+  .argument("<task-id>", "saved task id")
+  .option("--json", "Output the restored scope as JSON")
+  .action((taskId: string, options: { json?: boolean }) => {
+    scopeUseCommand(taskId, options);
+  });
+
+scope
+  .command("diff")
+  .description("Diff the active scope against a saved historical scope")
+  .requiredOption("--task <task-id>", "saved task id to compare against")
+  .option("--json", "Output the diff as JSON")
+  .action((options: { task?: string; json?: boolean }) => {
+    scopeDiffCommand(options);
+  });
+
+scope
+  .command("apply")
+  .description("Apply override flags to the active scope (writes current-scope.yaml)")
+  .option("--dry-run", "Show the patched scope without writing")
+  .option("--json", "Output the patched scope as JSON (no write)")
+  .option("--add-allowed <pattern>", "Add an allowed path (repeatable)", collect, [])
+  .option("--remove-allowed <pattern>", "Remove an allowed path (repeatable)", collect, [])
+  .option("--add-blocked <pattern>", "Add a blocked path (repeatable)", collect, [])
+  .option("--remove-blocked <pattern>", "Remove a blocked path (repeatable)", collect, [])
+  .option("--add-high-risk <pattern>", "Add a high-risk path (repeatable)", collect, [])
+  .option("--remove-high-risk <pattern>", "Remove a high-risk path (repeatable)", collect, [])
+  .option("--add-command <command>", "Add an allowed command (repeatable)", collect, [])
+  .option("--remove-command <command>", "Remove an allowed command (repeatable)", collect, [])
+  .action((options: Parameters<typeof scopeApplyCommand>[0]) => {
+    scopeApplyCommand(options);
   });
 
 async function main(): Promise<void> {

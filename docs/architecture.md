@@ -14,16 +14,17 @@ AgentScope 的架构必须支持以下长期目标：
 8. 默认本地运行，避免不必要 token 消耗
 9. 后续可扩展到 GitHub Action、Team Policy Registry、多 agent、企业审计
 
-## 2. 当前真实架构（截至 V1.5）
+## 2. 当前真实架构（截至 V2.2）
 
 当前项目是 **single-package layout**（不是 monorepo），core 与 cli 分离。下面是实际存在并已实现的模块：
 
 ```txt
 src/
   core/                      # 确定性、可测试、无 CLI/agent 依赖
-    schema/                  # Zod schema：ScopeContract、config
-    scope/                   # task-id、scope inference（V0 确定性规则）、scope 读写
-    config/                  # 默认 config + loader
+    schema/                  # Zod schema：ScopeContract、config（v1 + legacy 兼容）
+    scope/                   # task-id、scope 读写、create-scope（兼容包装）、override + diff 纯函数
+    scope-inference/         # V2.0 确定性 classifier + rule packs + inference engine
+    config/                  # config schema、effective-config 合并、loader（effective config）
     git/                     # 通过 git 获取 changed files
     check/                   # git diff scope check
     policy/                  # PolicyEngine + path/command matcher（ToolEvent → PolicyDecision）
@@ -34,7 +35,7 @@ src/
     adapters/
       claude-code/           # PreToolUse payload/translator、hook entrypoint、settings installer、path normalizer
   cli/                       # Commander 入口 + 命令编排
-    commands/                # init、start、show、check、hook、install、uninstall、evidence、report、risk
+    commands/                # init、start、show、check、hook、install、uninstall、evidence、report、risk、config、scope
 
 docs/
   product-vision.md
@@ -629,31 +630,45 @@ GitHub Action 不应该调用 LLM。
 
 ### .agentscope/config.yaml
 
-项目默认配置：
+V2.1 起，config 使用结构化的 add/remove 形状，并由 loader 归一化为 **effective config**（built-in defaults → legacy `defaults:` block → `policy.*` add/remove patch）。内部代码只消费 effective config，不直接读 raw config。
 
-project:
-  package_manager: npm
+当前真实 shape（V2.1）：
 
-defaults:
+version: 1
+
+policy:
   blocked_paths:
-    - .env*
-    - secrets/**
-    - migrations/**
-    - .github/**
+    add: []
+    remove: []
   high_risk:
-    - package.json
-    - package-lock.json
-    - pnpm-lock.yaml
-    - yarn.lock
+    add: []
+    remove: []
+  allowed_commands:
+    add: []
+    remove: []
   dangerous_commands:
-    - rm -rf *
-    - curl * | sh
-    - wget * | sh
-    - git push --force
+    add: []
+    remove: []
 
-policy_gate:
-  thresholds:
-    max_risk_score: 70
+inference:
+  confidence_threshold: 0.65
+  fallback:
+    enabled: true
+    allowed_paths:
+      - src/**
+      - tests/**
+      - __tests__/**
+  rule_packs:
+    disabled: []
+    overrides: {}
+
+说明：
+
+- 所有字段可选，缺失项回退 built-in defaults。
+- 旧的 top-level `defaults:` block（含 `defaults.dangerous_commands`）仍兼容，folded 进 effective config。
+- config 变更只影响**新生成**的 scope；已有 `current-scope.yaml` 不会自动改变，需要重新 `agentscope start`。
+- hook 的 dangerous command 判断读 `effectiveConfig.policy.dangerous_commands`；config 无效时 hook 不 crash、不削弱 enforcement，回退安全内置列表。
+- `policy_gate` / threshold 仍属 V3 规划，**尚未实现**。
 
 ### .agentscope/current-scope.yaml
 

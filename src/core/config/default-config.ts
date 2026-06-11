@@ -1,75 +1,54 @@
-import type { AgentScopeConfig } from "../schema/config.js";
+import {
+  defaultEffectiveConfig,
+  type EffectiveAgentScopeConfig,
+} from "./effective-config.js";
 
 /**
- * The default project configuration written by `agentscope init` and used as a
- * fallback by scope inference. Values mirror the V0 spec in CLAUDE.md.
+ * The effective config AgentScope falls back to when no `.agentscope/config.yaml`
+ * exists. This mirrors the built-in defaults; inference and the hook consume the
+ * effective config directly.
  */
-export function defaultConfig(): AgentScopeConfig {
-  return {
-    project: {
-      package_manager: "auto",
-    },
-    defaults: {
-      allowed_paths: ["src/**", "tests/**", "__tests__/**"],
-      blocked_paths: [
-        ".env*",
-        "secrets/**",
-        "migrations/**",
-        ".github/**",
-        "infra/**",
-      ],
-      high_risk: [
-        "package.json",
-        "package-lock.json",
-        "pnpm-lock.yaml",
-        "yarn.lock",
-      ],
-      allowed_commands: ["npm test", "npm run lint"],
-      dangerous_commands: [
-        "rm -rf *",
-        "curl * | sh",
-        "wget * | sh",
-        "git push --force",
-        "sudo *",
-      ],
-    },
-  };
+export function defaultConfig(): EffectiveAgentScopeConfig {
+  return defaultEffectiveConfig();
 }
 
 /**
- * Serialized form of the default config. Written verbatim by `agentscope init`
- * so the file stays human-readable and comment-friendly for the user to edit.
+ * Serialized default config written by `agentscope init` (V2.1 shape).
+ *
+ * Every list uses the add/remove structure so a project can tune the built-in
+ * defaults without restating them. Empty patches are written so the file is a
+ * ready-to-edit template; missing fields fall back to defaults on load.
  */
-export const DEFAULT_CONFIG_YAML = `project:
-  package_manager: auto
+export const DEFAULT_CONFIG_YAML = `version: 1
 
-defaults:
-  allowed_paths:
-    - "src/**"
-    - "tests/**"
-    - "__tests__/**"
-
+policy:
   blocked_paths:
-    - ".env*"
-    - "secrets/**"
-    - "migrations/**"
-    - ".github/**"
-    - "infra/**"
+    add: []
+    remove: []
 
   high_risk:
-    - "package.json"
-    - "package-lock.json"
-    - "pnpm-lock.yaml"
-    - "yarn.lock"
+    add: []
+    remove: []
 
   allowed_commands:
-    - "npm test"
-    - "npm run lint"
+    add: []
+    remove: []
 
   dangerous_commands:
-    - "rm -rf *"
-    - "curl * | sh"
-    - "wget * | sh"
-    - "git push --force"
-    - "sudo *"
+    add: []
+    remove: []
+
+inference:
+  confidence_threshold: 0.65
+
+  fallback:
+    enabled: true
+    allowed_paths:
+      - "src/**"
+      - "tests/**"
+      - "__tests__/**"
+
+  rule_packs:
+    disabled: []
+    overrides: {}
 `;

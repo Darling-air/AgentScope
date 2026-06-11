@@ -42,6 +42,9 @@ When Claude Code tries to read `.env.local`, AgentScope denies it. When it tries
 ## Status
 
 - ✅ Claude Code supported (live runtime enforcement)
+- ✅ Project-local config (`.agentscope/config.yaml`) for policy + inference tuning
+- ✅ Scope review & per-scope overrides (`scope explain` / `diff` / `apply`, `start` override flags)
+- ⏳ Team Policy Registry — **not implemented yet** (planned, V4)
 - ⏳ Policy Gate — **not implemented yet** (planned, V3)
 - ⏳ GitHub Action — **not implemented yet** (planned, V3)
 
@@ -270,6 +273,99 @@ The total is clamped to `0–100`. Recommendations are derived deterministically
 
 > **Not a policy gate.** `agentscope risk` and `agentscope report` are read-only summaries. They never set a failing exit code, apply no threshold, and do not fail CI. A CI Policy Gate is a later milestone (V3).
 
+## Configuration
+
+`agentscope init` writes `.agentscope/config.yaml`, a project-local file that tunes AgentScope's built-in policy defaults and inference preferences. Every list uses an `add` / `remove` structure so you adjust the defaults without restating them. All fields are optional — missing fields fall back to built-in defaults.
+
+```yaml
+version: 1
+
+policy:
+  blocked_paths:
+    add:
+      - private/**          # also block this path
+    remove:
+      - infra/**            # stop blocking this default
+  high_risk:
+    add:
+      - scripts/release/**  # require confirmation for these
+  dangerous_commands:
+    add:
+      - gh secret *         # deny this command at runtime
+
+inference:
+  confidence_threshold: 0.65   # below this, the broad fallback is used
+  fallback:
+    enabled: true
+    allowed_paths:
+      - src/**
+      - tests/**
+      - __tests__/**
+  rule_packs:
+    disabled: []               # rule-pack ids to skip (e.g. ["frontend"])
+    overrides:
+      auth:
+        allowed_paths:
+          add:
+            - app/auth/**      # extend the auth pack's allowed paths
+          remove:
+            - src/**/login*
+```
+
+Inspect and validate the resolved (effective) config:
+
+```bash
+agentscope config show          # human-readable effective config
+agentscope config show --json   # the effective config as JSON
+agentscope config validate      # exit 0 if valid (or no config), exit 1 if invalid
+```
+
+How config is applied:
+
+- **Effective config** = built-in defaults → legacy `defaults:` block (if any) → your `policy.*` add/remove patches. `add` appends and de-duplicates (preserving order); `remove` strips exact matches only.
+- **Config changes affect newly generated scopes only.** Editing `config.yaml` does **not** rewrite your active `.agentscope/current-scope.yaml`. Re-run `agentscope start "<task>"` to apply config changes to a new scope.
+- **Runtime dangerous commands** for the Claude Code hook are read from `policy.dangerous_commands` in the effective config. An invalid config never crashes the hook and never weakens enforcement — it falls back to the safe built-in dangerous-command list.
+- **Backward compatible:** an older config with a top-level `defaults:` block (including `defaults.dangerous_commands`) still works and is folded into the effective config.
+
+## Reviewing & overriding a scope
+
+Config is the project-wide layer that shapes *future* inference. **Overrides** are the per-scope layer that adjust *one* Task Scope Contract — without ever touching `config.yaml`. Every override is recorded in the scope's rationale as an `Override: ...` line, so it stays visible.
+
+### Override at `start` time
+
+`agentscope start` accepts repeatable override flags. Inference runs first, then the overrides are applied, then the usual approve / dry-run / json flow:
+
+```bash
+agentscope start "Fix login redirect bug" \
+  --add-allowed "app/auth/**" \
+  --remove-allowed "src/**/login*" \
+  --add-blocked "private/**" \
+  --add-high-risk "scripts/release/**" \
+  --add-command "npm run test:auth"
+```
+
+Flags (all repeatable): `--add-allowed` / `--remove-allowed`, `--add-blocked` / `--remove-blocked`, `--add-high-risk` / `--remove-high-risk`, `--add-command` / `--remove-command`. They compose with `--dry-run` (show the patched scope, write nothing) and `--json` (emit the patched scope plus the applied `overrides`).
+
+### The `scope` command group
+
+```bash
+agentscope scope explain                       # explain the active scope (paths, commands, rationale)
+agentscope scope explain --json                # the active scope as JSON
+
+agentscope scope diff --task "Fix login redirect bug"          # active scope vs a freshly inferred one
+agentscope scope diff --task "Fix login redirect bug" --json   # added/removed/unchanged as JSON
+
+agentscope scope apply --add-allowed "tests/app/auth/**"            # override the active scope (writes it)
+agentscope scope apply --add-allowed "tests/app/auth/**" --dry-run  # preview, write nothing
+agentscope scope apply --add-blocked "private/**" --json            # patched scope as JSON, no write
+```
+
+- `scope explain` reads the active `current-scope.yaml` and prints paths, commands, and the full rationale (including `Inference:` and `Override:` lines).
+- `scope diff --task` re-runs inference for a task using the current config and compares it against the active scope — useful to see what a fresh `start` would change. It writes nothing.
+- `scope apply` applies override flags to the active scope and rewrites `current-scope.yaml`. It does **not** re-run inference and does **not** modify `config.yaml`. An empty patch reports "no changes" and writes nothing; with no active scope it exits `1`.
+
+> Overrides change the active scope, and the Claude Code hook enforces whatever the active scope says. For example, removing `.env*` from `blocked_paths` via an override means a later `Read .env.local` is no longer denied — that is an explicit, user-requested change, and it shows up in the rationale.
+
 ## Files AgentScope writes
 
 ```
@@ -291,9 +387,10 @@ These are planned for later milestones and are **not implemented yet**:
 - ✅ Claude Code PreToolUse hook + installer with live runtime enforcement — *done in V1.0–V1.2*
 - ✅ Evidence Event Recorder (`evidence show` / `clear`, `report`) — *done in V1.3*
 - ✅ Risk Score V1 (`agentscope risk`) — *done in V1.4*
+- ✅ Project-local policy config (`.agentscope/config.yaml`, `config show` / `validate`) — *done in V2.1*
+- ❌ Team Policy Registry & templates (shared/remote policy) — *not yet, V4*
 - ❌ GitHub Action / Policy Gate in CI (threshold, exit codes) — *not yet, V3*
 - ❌ Evidence hashes (diff/transcript), signed evidence — *not yet, V3*
-- Team Policy Registry & templates — *V4*
 - Multi-agent governance (Cursor / Codex / Gemini), MCP-specific handling — *V5*
 - Web UI / dashboard, cloud services, LLM-based inference — later / out of scope
 
@@ -317,8 +414,9 @@ Core logic is kept separate from the CLI so that it stays agent-agnostic and reu
 src/
   core/                  # deterministic, testable, no CLI/agent dependencies
     schema/              # Zod schemas (ScopeContract, config)
-    scope/               # task-id, scope inference, scope read/write
-    config/              # default config + loader
+    scope/               # task-id, scope read/write, create-scope, override + diff
+    scope-inference/     # V2.0 deterministic classifier + rule packs + engine
+    config/              # config schema, effective-config merge, loader
     git/                 # changed-files via git
     check/               # scope check logic
     policy/              # centralized path matching (picomatch)
@@ -326,7 +424,7 @@ src/
     risk/                # Risk Score: schema, engine, recommendations
     fs/                  # project path resolution
   cli/                   # Commander entrypoint + command orchestration
-    commands/            # init, start, show, check, install, evidence, report, risk
+    commands/            # init, start, show, check, install, evidence, report, risk, config, scope
 
 docs/
   product-vision.md
